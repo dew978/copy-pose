@@ -1,17 +1,17 @@
-import {POSES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=3';
+import {POSES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=4';
 import {cameraPreflight,requestCameraStream,attachCameraVideo,cameraErrorMessage} from './camera-utils.mjs';
 import {createPoseModel} from './model-loader.mjs';
 const $=id=>document.getElementById(id);
 const ui={video:$('camera'),arena:$('arena'),tracking:$('tracking-canvas'),fx:$('fx-canvas'),cameraButton:$('camera-button'),play:$('play-button'),stop:$('stop-button'),message:$('game-message')};
 const engine=new MatchEngine();
 const solo=()=>engine.playerCount===1;
-const readyPrompt=()=>solo()?'혼자 머리부터 발끝까지 보이게 서 주세요. 화면 가운데에서도 연습할 수 있습니다.':'두 분 모두 머리부터 발끝까지 보이게 서 주세요. 화면 왼쪽이 Player 1, 오른쪽이 Player 2입니다.';
-const startLabel=()=>solo()?'연습 시작 →':'대결 시작 →';
+const readyPrompt=()=>solo()?'전신이 보이도록 서 계시면 3초 뒤 자동으로 시작합니다. 시작 버튼을 누르러 오지 않으셔도 됩니다.':'두 분의 전신이 모두 보이면 3초 뒤 자동으로 시작합니다. 화면 왼쪽이 Player 1, 오른쪽이 Player 2입니다.';
+const startLabel=()=>solo()?'연습 자동 시작 대기':'대결 자동 시작 대기';
 const findingLabel=()=>solo()?'전신을 찾는 중…':'두 명의 전신을 찾는 중…';
 function settingsLocked(){return !['ready','finished'].includes(engine.phase);}
 function updateSettingLock(){
   const locked=settingsLocked();$('mode-settings').disabled=locked;$('round-settings').disabled=locked;$('practice-pose').disabled=locked;
-  $('settings-hint').textContent=locked?'진행 중에는 설정이 고정됩니다. 바꾸려면 그만하기를 눌러 주세요.':solo()?`선택한 자세부터 ${engine.totalRounds}판 연습합니다. 라운드마다 5초!`:`선택한 ${engine.totalRounds}판을 모두 진행합니다. 라운드마다 5초!`;
+  $('settings-hint').textContent=locked?'진행 중에는 설정이 고정됩니다. 바꾸려면 그만하기를 눌러 주세요.':solo()?`10종 중 선택한 자세부터 ${engine.totalRounds}판 연습합니다. 라운드마다 5초!`:`10종 중 랜덤으로 ${engine.totalRounds}판을 진행합니다. 라운드마다 5초!`;
 }
 function renderSettings(){
   document.body.classList.toggle('solo-mode',solo());
@@ -37,7 +37,7 @@ function renderSettings(){
 }
 function changeSettings(options){
   if(settingsLocked())return;
-  engine.reset(options);roundToken++;players=Array(engine.playerCount).fill(null);seenAt=[0,0];liveScores=[null,null];stableSince=0;winner=null;celebrateUntil=0;particles=[];autoNextAt=0;
+  engine.reset(options);roundToken++;players=Array(engine.playerCount).fill(null);seenAt=[0,0];liveScores=[null,null];winner=null;celebrateUntil=0;particles=[];autoNextAt=0;
   show('result-overlay',false);show('round-history',false);show('countdown',false);show('position-guides');
   $('time-label').innerHTML='5.0 <small>SEC</small>';$('time-fill').style.transform='scaleX(1)';$('phase-label').textContent='준비되셨나요?';$('timer-caption').textContent='5초 안에 자세 완성';
   if(ready){show(ui.play);ui.play.disabled=true;ui.play.textContent=findingLabel();}
@@ -47,7 +47,7 @@ function changeSettings(options){
 let stream=null,worker=null,mainModel=null,ready=false,loading=false,busy=false;
 let modelEpoch=0,pendingWorker=null,selectedCamera='';
 let generation=0,roundToken=0,lastFrameTime=-1,lastCapture=0,modelErrors=0,frameSentAt=0;
-let players=[null,null],seenAt=[0,0],stableSince=0,liveScores=[null,null],winner=null,celebrateUntil=0;
+let players=[null,null],seenAt=[0,0],liveScores=[null,null],winner=null,celebrateUntil=0;
 let audio=null,sound=true,previousCount=-1,phaseWas='',particles=[],lastBurst=0,lastRender=0,autoNextAt=0;
 let W=1,H=1,dpr=1,pausedPhase=null;
 const colors=['#6fe5ed','#ff9470'];
@@ -112,7 +112,7 @@ async function startCamera(){
 }
 function stopCamera(){
   generation++;modelEpoch++;ready=false;loading=false;busy=false;worker?.terminate();worker=null;pendingWorker?.terminate();pendingWorker=null;mainModel?.close();mainModel=null;show('connection-panel',false);show('retry-model-button',false);show('camera-picker-label',false);
-  stream?.getTracks().forEach(t=>t.stop());stream=null;ui.video.srcObject=null;ui.video.style.display='none';players=[null,null];seenAt=[0,0];stableSince=0;winner=null;particles=[];celebrateUntil=0;autoNextAt=0;pausedPhase=null;
+  stream?.getTracks().forEach(t=>t.stop());stream=null;ui.video.srcObject=null;ui.video.style.display='none';players=[null,null];seenAt=[0,0];winner=null;particles=[];celebrateUntil=0;autoNextAt=0;pausedPhase=null;
   engine.reset();roundToken++;liveScores=[null,null];show('start-overlay');show('position-guides');show('countdown',false);show('result-overlay',false);show('round-history',false);show(ui.play,false);show(ui.stop,false);cameraState('CAMERA OFF');ui.cameraButton.disabled=false;ui.cameraButton.innerHTML='카메라 켜고 시작 <span aria-hidden="true">↗</span>';
   $('round-kicker').textContent='READY TO PLAY';$('round-title').textContent='몸으로 하는 한판 승부';setTarget(0);updateScores(true);updateSteps();$('time-label').innerHTML='5.0 <small>SEC</small>';$('phase-label').textContent='준비되셨나요?';$('time-fill').style.transform='scaleX(1)';$('tracking-status').textContent='카메라 한 대로 함께 플레이하세요';$('timer-caption').textContent='5초 안에 자세 완성';renderSettings();
 }
@@ -126,18 +126,33 @@ async function runtimeFailure(){
   finally{recovering=false;}
 }
 function processPoses(landmarks,timestamp,token){
-  players=assignPlayers(landmarks,ui.video.videoWidth,ui.video.videoHeight,engine.playerCount);
   const now=performance.now();
-  const scores=players.map((p,i)=>{if(!p?.complete){liveScores[i]=null;return null;}seenAt[i]=now;const n=scorePose(p.points,POSES[engine.poseIndex]);liveScores[i]=n;return n;});
+  if(now-timestamp>=750){players=Array(engine.playerCount).fill(null);liveScores=[null,null];return;}
+  players=assignPlayers(landmarks,ui.video.videoWidth,ui.video.videoHeight,engine.playerCount);
+  const scores=players.map((p,i)=>{if(!p?.complete){liveScores[i]=null;return null;}seenAt[i]=timestamp;const n=scorePose(p.points,POSES[engine.poseIndex]);liveScores[i]=n;return n;});
   if(token===roundToken&&now-timestamp<900)engine.sample(scores,timestamp);
 }
-function fullyReady(now){return players.length===engine.playerCount&&players.every((p,i)=>p?.complete&&now-seenAt[i]<750);}
+function fullyReady(now){return !document.hidden&&players.length===engine.playerCount&&players.every((p,i)=>p?.complete&&now-seenAt[i]<750);}
 function startRound(){
-  if(!ready||!fullyReady(performance.now())){message(readyPrompt());return false;}
-  if(engine.phase==='finished'){engine.reset();show('round-history',false);winner=null;particles=[];celebrateUntil=0;}
-  if(!engine.prepare(performance.now()))return false;
-  roundToken++;winner=null;celebrateUntil=0;autoNextAt=0;liveScores=[null,null];previousCount=-1;show('result-overlay',false);show(ui.play,false);show('position-guides',false);show('countdown');$('countdown').classList.remove('active');$('countdown-caption').textContent='곧 시작합니다';
-  setTarget(engine.poseIndex);updateSettingLock();$('round-kicker').textContent=solo()?'PRACTICE IN PROGRESS':'MATCH IN PROGRESS';$('round-title').textContent=`Round ${engine.index+1} / ${engine.totalRounds}`;$('phase-label').textContent='준비 시간';message('3초 뒤 시작합니다. 제시된 자세를 확인해 주세요.');updateSteps();updateScores(true);return true;
+  if(!ready||!['ready','retry','result','finished'].includes(engine.phase))return false;
+  // Replay can be armed up close; full-body recognition is checked after stepping back.
+  if(engine.phase==='finished')changeSettings({});
+  autoNextAt=0;show('result-overlay',false);message(readyPrompt());
+  ui.play.disabled=true;ui.play.textContent=startLabel();
+  return true;
+}
+function showRoundPreparation(){
+  roundToken++;winner=null;celebrateUntil=0;autoNextAt=0;liveScores=[null,null];previousCount=-1;
+  show('result-overlay',false);show(ui.play,false);show('position-guides',false);show('countdown');
+  $('countdown').classList.remove('active');$('countdown-caption').textContent='전신 인식 완료 · 자동 시작';
+  setTarget(engine.poseIndex);updateSettingLock();$('round-kicker').textContent=solo()?'PRACTICE IN PROGRESS':'MATCH IN PROGRESS';
+  $('round-title').textContent=`Round ${engine.index+1} / ${engine.totalRounds}`;$('phase-label').textContent='3초 뒤 자동 시작';
+  message('전신 인식 완료! 그대로 서 계시면 3초 뒤 시작합니다.');updateSteps();updateScores(true);
+}
+function waitForPlayers(){
+  roundToken++;previousCount=-1;autoNextAt=0;show('countdown',false);show('result-overlay',false);show('position-guides');show(ui.play);
+  ui.play.disabled=true;ui.play.textContent=findingLabel();$('phase-label').textContent='전신 인식 대기';$('timer-caption').textContent='전신 인식 후 3초 자동 시작';
+  updateSettingLock();message('전신 인식이 끊겨 카운트다운을 멈췄습니다. 모두 다시 보이면 3초부터 자동으로 시작합니다.');
 }
 function updateSteps(){[...$('round-steps').children].forEach((li,i)=>{li.classList.toggle('done',i<engine.rounds.length);li.classList.toggle('current',i===engine.rounds.length&&engine.phase!=='finished');li.setAttribute('aria-label',`Round ${i+1}${i<engine.rounds.length?' 완료':''}`);});}
 function updateScores(reset=false){
@@ -167,7 +182,7 @@ function renderHistory(){
 function finishRound(state,now){
   show('countdown',false);show('result-overlay');$('result-overlay').classList.remove('final');$('time-fill').style.transform='scaleX(0)';$('time-label').innerHTML='0.0 <small>SEC</small>';show(ui.play);ui.play.disabled=false;
   if(state==='retry'){
-    $('result-kicker').textContent='TRY AGAIN';$('result-title').textContent='한 번 더!';$('result-detail').textContent=solo()?'전신 인식이 충분하지 않았어요.':'두 명의 전신 인식이 충분하지 않았어요.';$('phase-label').textContent='같은 라운드 재도전';ui.play.textContent='이 라운드 다시 도전 →';message('전신이 보이도록 물러나 주세요. 약 0.4초 이상 자세를 유지하면 점수가 기록됩니다.');return;
+    $('result-kicker').textContent='TRY AGAIN';$('result-title').textContent='한 번 더!';$('result-detail').textContent=solo()?'전신 인식이 충분하지 않았어요.':'두 명의 전신 인식이 충분하지 않았어요.';$('phase-label').textContent='같은 라운드 재도전';ui.play.disabled=true;ui.play.textContent='전신 인식 후 자동 재도전';autoNextAt=now+2500;message('전신이 보이면 3초 뒤 자동 재도전합니다. 약 0.4초 이상 자세를 유지하면 점수가 기록됩니다.');return;
   }
   updateSettingLock();
   if(solo()){
@@ -225,23 +240,23 @@ function loop(now){
   const delta=lastRender?now-lastRender:16.67;lastRender=now;
   ctx.clearRect(0,0,W,H);
   if(ready){players.forEach((p,i)=>drawSkeleton(p,i,now));
-    const both=fullyReady(now);if(both){if(!stableSince)stableSince=now;}else stableSince=0;
-    const canStart=both&&now-stableSince>=600;
+    const both=fullyReady(now);
     if(['ready','retry','result','finished'].includes(engine.phase)){
-      ui.play.disabled=!canStart;
-      if(engine.phase==='ready')ui.play.textContent=canStart?startLabel():findingLabel();
+      ui.play.disabled=engine.phase==='ready'||engine.phase==='retry';
+      if(engine.phase==='ready'||engine.phase==='retry')ui.play.textContent=both?'3초 뒤 자동 시작':findingLabel();
     }
-    if(engine.phase==='ready'||engine.phase==='retry'){$('tracking-status').textContent=both?(solo()?'전신 인식 완료 · 연습 준비 완료':'두 명 모두 인식되었습니다'):'머리부터 발끝까지 화면 안에 넣어 주세요';show('position-guides',!both);}
+    if(engine.phase==='ready'||engine.phase==='retry'){$('tracking-status').textContent=both?'전신 인식 완료 · 자동 시작 준비':'머리부터 발끝까지 화면 안에 넣어 주세요';show('position-guides',!both);}
     else $('tracking-status').textContent=both?(solo()?'1 PLAYER TRACKED':'2 PLAYERS TRACKED'):'전신이 가려지지 않게 해 주세요';
-    const change=engine.tick(now);
+    const change=engine.advance(now,{allReady:both,visible:!document.hidden,notBefore:autoNextAt});
+    if(change==='prepare')showRoundPreparation();
+    if(change==='waiting')waitForPlayers();
     if(change==='playing'){roundToken++;previousCount=-1;$('countdown').classList.add('active');$('phase-label').textContent='자세를 유지하세요';message('그림과 같은 방향으로 따라 하세요. 5초 안에 가장 잘 유지한 자세가 기록됩니다.');beep(1000,.15);}
     if(['result','finished','retry'].includes(change))finishRound(change,now);
     if(engine.phase==='prepare'||engine.phase==='playing'){
       const left=Math.max(0,(engine.end-now)/1000),count=Math.ceil(left);$('countdown-number').textContent=count;
       if(count!==previousCount){previousCount=count;beep(engine.phase==='prepare'?440:660,.08);}
-      $('time-label').innerHTML=(engine.phase==='prepare'?'5.0':left.toFixed(1))+' <small>SEC</small>';$('time-fill').style.transform=`scaleX(${engine.phase==='prepare'?1:left/5})`;$('timer-caption').textContent=engine.phase==='prepare'?'준비!':`${left.toFixed(1)}초 남음`;
+      $('time-label').innerHTML=(engine.phase==='prepare'?'5.0':left.toFixed(1))+' <small>SEC</small>';$('time-fill').style.transform=`scaleX(${engine.phase==='prepare'?1:left/5})`;$('timer-caption').textContent=engine.phase==='prepare'?`${count}초 뒤 자동 시작`:`${left.toFixed(1)}초 남음`;
     }
-    if(engine.phase==='result'&&autoNextAt&&now>=autoNextAt&&canStart)startRound();
     if(busy&&frameSentAt&&now-frameSentAt>20000)runtimeFailure();
     capture(now);updateScores();
   }
@@ -254,11 +269,11 @@ $('sound-button').addEventListener('click',async()=>{sound=!sound;$('sound-butto
 $('fullscreen-button').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{message('이 브라우저에서는 전체 화면 전환을 지원하지 않습니다. 가로 모드로 플레이하시면 더 넓게 보입니다.');}});
 $('rules-button').addEventListener('click',()=>$('rules-dialog').showModal());$('close-rules').addEventListener('click',()=>$('rules-dialog').close());$('rules-dialog').addEventListener('click',e=>{if(e.target===$('rules-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden&&['playing','prepare'].includes(engine.phase)){engine.phase='retry';roundToken++;autoNextAt=0;show('countdown',false);show('result-overlay',false);show(ui.play);ui.play.textContent='이 라운드 다시 도전 →';message('화면을 벗어나 대결이 멈췄습니다. 같은 라운드를 다시 시작해 주세요.');}
+  if(document.hidden){players=Array(engine.playerCount).fill(null);seenAt=[0,0];if(['playing','prepare'].includes(engine.phase)){engine.phase='retry';roundToken++;autoNextAt=0;show('countdown',false);show('result-overlay',false);show(ui.play);ui.play.disabled=true;ui.play.textContent='전신 인식 후 자동 재도전';message('화면을 벗어나 게임을 멈췄습니다. 돌아와 전신이 보이면 다시 3초 뒤 시작합니다.');}}
 });
 window.addEventListener('pagehide',()=>{generation++;stream?.getTracks().forEach(t=>t.stop());worker?.terminate();mainModel?.close();});
 // Optional, progressive enhancement for browsers implementing WebMCP.
-if(document.modelContext?.registerTool){const controller=new AbortController();const read=()=>({phase:engine.phase,round:engine.index+1,totalRounds:engine.totalRounds,playerCount:engine.playerCount,mode:solo()?'practice':'duel',cameraReady:ready,playersDetected:players.map(p=>!!p?.complete),rounds:engine.rounds,...(solo()?practiceResult(engine.rounds):matchResult(engine.rounds))});for(const tool of [{name:'get_copy_pose_match',description:'Read the current Copy Pose match, scores, and camera readiness.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');return read();}},{name:'start_copy_pose_round',description:'Start the next Copy Pose round only after the selected number of players are visible and the camera is ready. Camera permission must be granted using the visible button.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');if(!startRound())throw new Error('Camera and all required full bodies must be ready, and no round may be active.');return read();}}]){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}catch{}}window.addEventListener('pagehide',()=>controller.abort(),{once:true});}
+if(document.modelContext?.registerTool){const controller=new AbortController();const read=()=>({phase:engine.phase,round:engine.index+1,totalRounds:engine.totalRounds,playerCount:engine.playerCount,mode:solo()?'practice':'duel',cameraReady:ready,automaticStart:true,poseCount:POSES.length,playersDetected:players.map(p=>!!p?.complete),rounds:engine.rounds,...(solo()?practiceResult(engine.rounds):matchResult(engine.rounds))});for(const tool of [{name:'get_copy_pose_match',description:'Read the current Copy Pose match, scores, and camera readiness.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');return read();}},{name:'start_copy_pose_round',description:'Arm the next round or a replay. It starts automatically after all required players are visible for 3 seconds. Camera permission must be granted using the visible button.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');if(!startRound())throw new Error('Camera must be ready and no round may be active.');return read();}}]){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}catch{}}window.addEventListener('pagehide',()=>controller.abort(),{once:true});}
 document.querySelectorAll('[data-players]').forEach(b=>b.addEventListener('click',()=>changeSettings({playerCount:Number(b.dataset.players),poseOffset:Number(b.dataset.players)===1?Number($('practice-pose').value):0})));
 document.querySelectorAll('[data-rounds]').forEach(b=>b.addEventListener('click',()=>changeSettings({totalRounds:Number(b.dataset.rounds)})));
 $('practice-pose').addEventListener('change',e=>changeSettings({poseOffset:Number(e.target.value)}));

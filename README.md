@@ -5,8 +5,8 @@ One-player practice or two-player same-camera pose matching game. Choose 1, 3, o
 ## Gameplay
 
 - Left and right screen halves identify Player 1 and Player 2. Players must remain in their assigned halves.
-- Three-second preparation, then a five-second scoring window per round.
-- Five exact reference pose diagrams are generated from the same landmarks used by the scoring function.
+- All required full bodies automatically trigger a three-second countdown, followed immediately by a five-second scoring window. Losing recognition cancels the countdown; returning restarts it from three. Results pause before the next automatic round. Final results remain until replay is armed; the replay button works even up close.
+- Ten exact reference pose diagrams are generated from the same landmarks used by the scoring function.
 - Coordinates are mirrored into display space and corrected for video aspect ratio. Segment directions and elbow/knee angles are compared, removing translation and body-scale differences.
 - Scores are the maximum mean of a 350–650 ms valid sample window with at least three observations. No random scores or face-based scoring.
 - Missing full-body data causes a retry instead of awarding a false score or a default win.
@@ -15,7 +15,9 @@ One-player practice or two-player same-camera pose matching game. Choose 1, 3, o
 
 ## Practice mode
 
-Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Choose a starting pose, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
+Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Choose one of ten starting poses, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
+
+Two-player matches draw poses from the full ten-pose pool without repeats within a match. Practice proceeds sequentially from the selected pose. Round counts remain 1, 3, and 5.
 
 ## Inference
 

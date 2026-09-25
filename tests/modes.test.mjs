@@ -37,11 +37,11 @@ test('practice missing tracking retries and cannot record a score from a single 
   assert.equal(completeRound(g,9000,[83]),'finished');assert.equal(practiceResult(g.rounds).best,83);
 });
 test('practice start pose wraps across the pose list and reset clears old results',()=>{
-  const g=new MatchEngine({playerCount:1,totalRounds:3,poseOffset:4});
+  const g=new MatchEngine({playerCount:1,totalRounds:3,poseOffset:9});
   for(let i=0;i<3;i++)completeRound(g,i*9000,[75]);
-  assert.deepEqual(g.rounds.map(r=>r.pose),[POSES[4].id,POSES[0].id,POSES[1].id]);
-  g.reset({playerCount:2,totalRounds:1,poseOffset:0});assert.equal(g.poseIndex,0);assert.equal(g.phase,'ready');assert.equal(g.windows.length,2);assert.ok(g.windows.every(w=>w.best===null));assert.deepEqual(g.rounds,[]);
+  assert.deepEqual(g.rounds.map(r=>r.pose),[POSES[9].id,POSES[0].id,POSES[1].id]);
+  g.reset({playerCount:2,totalRounds:1,poseOffset:0});assert.equal(g.index,0);assert.equal(g.poseOffset,0);assert.ok(g.poseIndex>=0&&g.poseIndex<POSES.length);assert.equal(g.phase,'ready');assert.equal(g.windows.length,2);assert.ok(g.windows.every(w=>w.best===null));assert.deepEqual(g.rounds,[]);
 });
 test('unsupported configurations are rejected',()=>{
-  for(const options of [{playerCount:0},{playerCount:3},{totalRounds:2},{poseOffset:5}])assert.throws(()=>new MatchEngine(options),RangeError);
+  for(const options of [{playerCount:0},{playerCount:3},{totalRounds:2},{poseOffset:10}])assert.throws(()=>new MatchEngine(options),RangeError);
 });

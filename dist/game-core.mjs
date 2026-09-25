@@ -13,7 +13,12 @@ export const POSES=[
   makePose('wings','비행기','수평으로 쭉 펼치세요','팔을 양옆으로 곧게 펴고, 두 발을 가깝게 모아 주세요.',{13:[-.98,-.72],14:[.98,-.72],15:[-1.61,-.72],16:[1.61,-.72],25:[-.2,.97],26:[.2,.97],27:[-.16,1.69],28:[.16,1.69]}),
   makePose('goal','골인!','팔꿈치를 직각으로','양팔을 옆으로 들고 팔꿈치를 90도로 구부려 손을 위로 올리세요.',{13:[-1,-.72],14:[1,-.72],15:[-1,-1.37],16:[1,-1.37],25:[-.4,.95],26:[.4,.95],27:[-.57,1.65],28:[.57,1.65]}),
   makePose('lightning','번개 포즈','그림과 같은 방향으로','화면 왼쪽 팔은 위로, 오른쪽 팔은 옆으로 쭉 펴 주세요.',{13:[-.47,-1.38],14:[1,-.72],15:[-.57,-2.03],16:[1.63,-.72],25:[-.35,.97],26:[.35,.97],27:[-.46,1.69],28:[.46,1.69]}),
-  makePose('disco','디스코 타임','마지막 자세까지 정확하게','화면 왼쪽 팔은 대각선 위로, 오른쪽 팔은 대각선 아래로 펴 주세요.',{13:[-.89,-1.2],14:[.89,-.24],15:[-1.4,-1.67],16:[1.4,.24],25:[-.48,.94],26:[.48,.94],27:[-.73,1.63],28:[.73,1.63]})
+  makePose('disco','디스코 타임','위아래로 쭉 뻗으세요','화면 왼쪽 팔은 대각선 위로, 오른쪽 팔은 대각선 아래로 펴 주세요.',{13:[-.89,-1.2],14:[.89,-.24],15:[-1.4,-1.67],16:[1.4,.24],25:[-.48,.94],26:[.48,.94],27:[-.73,1.63],28:[.73,1.63]}),
+  makePose('cheer','만세!','두 손을 머리 위로','두 팔을 머리 위로 곧게 올리고, 발을 가깝게 모아 주세요.',{13:[-.43,-1.38],14:[.43,-1.38],15:[-.5,-2.03],16:[.5,-2.03],25:[-.2,.97],26:[.2,.97],27:[-.15,1.69],28:[.15,1.69]}),
+  makePose('robot','로봇 포즈','팔꿈치 아래로 직각','양팔을 옆으로 들고 팔꿈치를 구부려 두 손이 아래를 향하게 하세요.',{13:[-1,-.72],14:[1,-.72],15:[-1,-.07],16:[1,-.07],25:[-.3,.97],26:[.3,.97],27:[-.36,1.69],28:[.36,1.69]}),
+  makePose('hero','히어로','두 손은 허리에','두 손을 허리에 대고 팔꿈치는 옆으로 벌리세요. 두 발도 넓게 벌려 주세요.',{13:[-.87,-.22],14:[.87,-.22],15:[-.35,.2],16:[.35,.2],25:[-.49,.94],26:[.49,.94],27:[-.75,1.63],28:[.75,1.63]}),
+  makePose('balance','외발 비행기','무릎을 살짝 들어 보세요','팔을 양옆으로 펴고 화면 오른쪽 무릎을 들어 주세요. 몸은 똑바로 세우세요.',{13:[-.98,-.72],14:[.98,-.72],15:[-1.61,-.72],16:[1.61,-.72],25:[-.3,.97],26:[.92,.42],27:[-.35,1.69],28:[.92,1.12]}),
+  makePose('hello','안녕 포즈','한 손으로 인사해요','화면 왼쪽 팔꿈치를 구부려 손을 위로 올리고, 오른팔은 아래로 내려 주세요.',{13:[-.97,-.85],14:[.43,-.05],15:[-1.1,-1.49],16:[.5,.61],25:[-.2,.97],26:[.2,.97],27:[-.16,1.69],28:[.16,1.69]})
 ];
 const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y});
 const magnitude=a=>Math.hypot(a.x,a.y);
@@ -71,15 +76,23 @@ export function practiceResult(rounds){
   return {average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10:0,best:scores.length?Math.max(...scores):null,completed:rounds.length};
 }
 export class MatchEngine{
-  constructor(options={}){this.playerCount=2;this.totalRounds=5;this.poseOffset=0;this.reset(options);}
+  constructor({random=Math.random,...options}={}){this.random=random;this.playerCount=2;this.totalRounds=5;this.poseOffset=0;this.reset(options);}
   reset({playerCount=this.playerCount,totalRounds=this.totalRounds,poseOffset=this.poseOffset}={}){
     if(![1,2].includes(playerCount)||![1,3,5].includes(totalRounds)||!Number.isInteger(poseOffset)||poseOffset<0||poseOffset>=POSES.length)throw new RangeError('Invalid game settings');
     this.playerCount=playerCount;this.totalRounds=totalRounds;this.poseOffset=poseOffset;
+    this.poseOrder=POSES.map((_,i)=>(i+poseOffset)%POSES.length);
+    if(playerCount===2)for(let i=this.poseOrder.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[this.poseOrder[i],this.poseOrder[j]]=[this.poseOrder[j],this.poseOrder[i]];}
     this.rounds=[];this.phase='ready';this.index=0;this.end=0;this.windows=Array.from({length:playerCount},()=>new ScoreWindow());
   }
-  get poseIndex(){return (this.index+this.poseOffset)%POSES.length;}
+  get poseIndex(){return this.poseOrder[this.index];}
   prepare(now){if(!['ready','result','retry'].includes(this.phase))return false;if(this.rounds.length>=this.totalRounds)return false;this.index=this.rounds.length;this.phase='prepare';this.end=now+3000;this.windows.forEach(w=>w.reset());return true;}
-  tick(now){
+  advance(now,{allReady=false,visible=true,notBefore=0}={}){
+    const recognized=allReady&&visible;
+    if(recognized&&now>=notBefore&&['ready','retry','result'].includes(this.phase)&&this.prepare(now))return 'prepare';
+    return this.tick(now,recognized);
+  }
+  tick(now,allReady=true){
+    if(this.phase==='prepare'&&!allReady){this.phase=this.rounds.length?'retry':'ready';this.end=0;return 'waiting';}
     if(this.phase==='prepare'&&now>=this.end){this.phase='playing';this.end=now+5000;return 'playing';}
     if(this.phase==='playing'&&now>=this.end){
       const scores=this.windows.map(w=>w.best);
