@@ -8,9 +8,11 @@ export async function createPoseModel(onProgress=()=>{}){
     modelBase={modelAssetBuffer:assets.modelBuffer};
   }else{
     onProgress('자세 인식을 준비하고 있습니다…');
-    const vision=await import('./assets/vision_bundle.mjs');PoseLandmarker=vision.PoseLandmarker;
-    files=await vision.FilesetResolver.forVisionTasks(new URL('./assets/wasm',import.meta.url).href);
-    modelBase={modelAssetPath:new URL('./assets/pose_landmarker_full.task',import.meta.url).href};
+    let vision,remote=false;
+    try{vision=await import('./assets/vision_bundle.mjs');}catch{remote=true;vision=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs');}
+    PoseLandmarker=vision.PoseLandmarker;
+    files=await vision.FilesetResolver.forVisionTasks(remote?'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm':new URL('./assets/wasm',import.meta.url).href);
+    modelBase={modelAssetPath:remote?'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task':new URL('./assets/pose_landmarker_full.task',import.meta.url).href};
   }
   const options={baseOptions:{...modelBase,delegate:'GPU'},runningMode:'VIDEO',numPoses:2,minPoseDetectionConfidence:.45,minPosePresenceConfidence:.45,minTrackingConfidence:.45};
   try{return await PoseLandmarker.createFromOptions(files,options);}catch{

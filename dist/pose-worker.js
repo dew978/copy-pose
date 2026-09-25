@@ -1,8 +1,10 @@
 let model;
 async function setup(){
-  const {FilesetResolver,PoseLandmarker}=await import('./assets/vision_bundle.mjs');
-  const vision=await FilesetResolver.forVisionTasks(new URL('./assets/wasm',self.location.href).href);
-  const options={baseOptions:{modelAssetPath:new URL('./assets/pose_landmarker_full.task',self.location.href).href,delegate:'GPU'},runningMode:'VIDEO',numPoses:2,minPoseDetectionConfidence:.45,minPosePresenceConfidence:.45,minTrackingConfidence:.45,outputSegmentationMasks:false};
+  let library,remote=false;
+  try{library=await import('./assets/vision_bundle.mjs');}catch{remote=true;library=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs');}
+  const {FilesetResolver,PoseLandmarker}=library;
+  const vision=await FilesetResolver.forVisionTasks(remote?'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm':new URL('./assets/wasm',self.location.href).href);
+  const options={baseOptions:{modelAssetPath:remote?'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task':new URL('./assets/pose_landmarker_full.task',self.location.href).href,delegate:'GPU'},runningMode:'VIDEO',numPoses:2,minPoseDetectionConfidence:.45,minPosePresenceConfidence:.45,minTrackingConfidence:.45,outputSegmentationMasks:false};
   try{model=await PoseLandmarker.createFromOptions(vision,options);}catch{options.baseOptions.delegate='CPU';model=await PoseLandmarker.createFromOptions(vision,options);}
   postMessage({type:'ready'});
 }
