@@ -32,7 +32,13 @@ export function scorePose(points,target){
 }
 export function screenLandmarks(raw,width,height){return raw.map(p=>p?{...p,x:(1-p.x)*width,y:p.y*height}:null);}
 export function poseVisibleInFrame(raw){return usablePose(raw)&&REQUIRED.every(i=>raw[i].x>.005&&raw[i].x<.995&&raw[i].y>.005&&raw[i].y<.995);}
-export function assignPlayers(poses,width,height){
+export function assignPlayers(poses,width,height,playerCount=2){
+  if(playerCount===1){
+    // Practice accepts a full body anywhere, including the center divider.
+    const candidates=poses.filter(raw=>raw[23]&&raw[24]&&raw[11]&&raw[12]).map(raw=>({raw,points:screenLandmarks(raw,width,height),confidence:REQUIRED.reduce((s,i)=>s+(raw[i]?.visibility||0),0)/REQUIRED.length,complete:poseVisibleInFrame(raw)}));
+    candidates.sort((a,b)=>Number(b.complete)-Number(a.complete)||b.confidence-a.confidence);
+    return [candidates[0]||null];
+  }
   const out=[null,null];
   // Fixed halves prevent IDs and scores swapping when detections reorder.
   for(const raw of poses){if(!raw[23]||!raw[24]||!raw[11]||!raw[12])continue;
@@ -60,19 +66,28 @@ export function matchResult(rounds){
   const tiedWins=wins[0]===wins[1];const winner=tiedWins?roundWinner(averages):wins[0]>wins[1]?0:1;
   return {wins,averages,winner,tiedWins};
 }
+export function practiceResult(rounds){
+  const scores=rounds.map(r=>r.scores[0]);
+  return {average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10:0,best:scores.length?Math.max(...scores):null,completed:rounds.length};
+}
 export class MatchEngine{
-  constructor(){this.reset();}
-  reset(){this.rounds=[];this.phase='ready';this.index=0;this.end=0;this.windows=[new ScoreWindow(),new ScoreWindow()];}
-  prepare(now){if(!['ready','result','retry'].includes(this.phase))return false;if(this.rounds.length>=5)return false;this.index=this.rounds.length;this.phase='prepare';this.end=now+3000;this.windows.forEach(w=>w.reset());return true;}
+  constructor(options={}){this.playerCount=2;this.totalRounds=5;this.poseOffset=0;this.reset(options);}
+  reset({playerCount=this.playerCount,totalRounds=this.totalRounds,poseOffset=this.poseOffset}={}){
+    if(![1,2].includes(playerCount)||![1,3,5].includes(totalRounds)||!Number.isInteger(poseOffset)||poseOffset<0||poseOffset>=POSES.length)throw new RangeError('Invalid game settings');
+    this.playerCount=playerCount;this.totalRounds=totalRounds;this.poseOffset=poseOffset;
+    this.rounds=[];this.phase='ready';this.index=0;this.end=0;this.windows=Array.from({length:playerCount},()=>new ScoreWindow());
+  }
+  get poseIndex(){return (this.index+this.poseOffset)%POSES.length;}
+  prepare(now){if(!['ready','result','retry'].includes(this.phase))return false;if(this.rounds.length>=this.totalRounds)return false;this.index=this.rounds.length;this.phase='prepare';this.end=now+3000;this.windows.forEach(w=>w.reset());return true;}
   tick(now){
     if(this.phase==='prepare'&&now>=this.end){this.phase='playing';this.end=now+5000;return 'playing';}
     if(this.phase==='playing'&&now>=this.end){
       const scores=this.windows.map(w=>w.best);
       if(scores.some(s=>s===null)){this.phase='retry';return 'retry';}
-      this.rounds.push({pose:POSES[this.index].id,scores});this.phase=this.rounds.length===5?'finished':'result';return this.phase;
+      this.rounds.push({pose:POSES[this.poseIndex].id,scores});this.phase=this.rounds.length===this.totalRounds?'finished':'result';return this.phase;
     }return null;
   }
-  sample(scores,now){if(this.phase!=='playing'||now>=this.end)return; scores.forEach((s,i)=>this.windows[i].add(s,now));}
+  sample(scores,now){if(this.phase!=='playing'||now>=this.end)return; this.windows.forEach((w,i)=>w.add(scores[i],now));}
 }
 export function poseSVG(pose){
   const p=pose.points;const xy=i=>({x:150+p[i].x*68,y:151+p[i].y*68});

@@ -1,9 +1,49 @@
-import {POSES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,roundWinner,poseSVG} from './game-core.mjs';
+import {POSES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=3';
 import {cameraPreflight,requestCameraStream,attachCameraVideo,cameraErrorMessage} from './camera-utils.mjs';
 import {createPoseModel} from './model-loader.mjs';
 const $=id=>document.getElementById(id);
 const ui={video:$('camera'),arena:$('arena'),tracking:$('tracking-canvas'),fx:$('fx-canvas'),cameraButton:$('camera-button'),play:$('play-button'),stop:$('stop-button'),message:$('game-message')};
 const engine=new MatchEngine();
+const solo=()=>engine.playerCount===1;
+const readyPrompt=()=>solo()?'혼자 머리부터 발끝까지 보이게 서 주세요. 화면 가운데에서도 연습할 수 있습니다.':'두 분 모두 머리부터 발끝까지 보이게 서 주세요. 화면 왼쪽이 Player 1, 오른쪽이 Player 2입니다.';
+const startLabel=()=>solo()?'연습 시작 →':'대결 시작 →';
+const findingLabel=()=>solo()?'전신을 찾는 중…':'두 명의 전신을 찾는 중…';
+function settingsLocked(){return !['ready','finished'].includes(engine.phase);}
+function updateSettingLock(){
+  const locked=settingsLocked();$('mode-settings').disabled=locked;$('round-settings').disabled=locked;$('practice-pose').disabled=locked;
+  $('settings-hint').textContent=locked?'진행 중에는 설정이 고정됩니다. 바꾸려면 그만하기를 눌러 주세요.':solo()?`선택한 자세부터 ${engine.totalRounds}판 연습합니다. 라운드마다 5초!`:`선택한 ${engine.totalRounds}판을 모두 진행합니다. 라운드마다 5초!`;
+}
+function renderSettings(){
+  document.body.classList.toggle('solo-mode',solo());
+  document.querySelectorAll('[data-players]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.players)===engine.playerCount));
+  document.querySelectorAll('[data-rounds]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.rounds)===engine.totalRounds));
+  show('practice-pose-label',solo());
+  $('round-steps').innerHTML=Array.from({length:engine.totalRounds},(_,i)=>`<li>${String(i+1).padStart(2,'0')}</li>`).join('');
+  $('round-steps').setAttribute('aria-label',`총 ${engine.totalRounds}라운드`);
+  $('round-history').style.gridTemplateColumns=`repeat(${engine.totalRounds},minmax(0,1fr))`;
+  $('start-badge').textContent=`${engine.totalRounds} ${engine.totalRounds===1?'ROUND':'ROUNDS'} · 5 SECONDS`;
+  $('start-title').innerHTML=solo()?'나만의 연습,<br><em>더 높은 점수.</em>':'같은 자세,<br><em>다른 점수.</em>';
+  $('start-instruction').textContent=readyPrompt();
+  document.querySelector('.header-tag').textContent=solo()?'ONE PLAYER. YOUR PACE.':'TWO PLAYERS. ONE POSE.';
+  document.querySelector('.zone-left').innerHTML=solo()?'<span class="player-dot p1"></span>PRACTICE':'<span class="player-dot p1"></span>PLAYER 1';
+  document.querySelector('#position-guides>div:first-child p').textContent=solo()?'전신이 보이게 서 주세요':'왼쪽에 서 주세요';
+  document.querySelector('.player-one h2').textContent=solo()?'MY SCORE':'PLAYER 1';
+  ui.arena.setAttribute('aria-label',solo()?'1인 연습 카메라 화면':'두 명의 카메라 플레이 화면');
+  $('round-kicker').textContent=solo()?'PRACTICE MODE':'READY TO PLAY';
+  $('round-title').textContent=solo()?'혼자 연습하고, 기록을 높이세요':'몸으로 하는 한판 승부';
+  $('tracking-status').textContent=solo()?'혼자 화면 전체에서 연습하세요':'카메라 한 대로 함께 플레이하세요';
+  setTarget(engine.poseIndex);updateSteps();updateScores(true);updateSettingLock();
+  message(solo()?`${engine.totalRounds}판 연습 · 5초 안에 자세를 따라 하고 점수를 확인하세요.`:`${engine.totalRounds}판 대결 · 5초 안에 자세를 따라 하고 더 많은 라운드에서 승리하세요!`);
+}
+function changeSettings(options){
+  if(settingsLocked())return;
+  engine.reset(options);roundToken++;players=Array(engine.playerCount).fill(null);seenAt=[0,0];liveScores=[null,null];stableSince=0;winner=null;celebrateUntil=0;particles=[];autoNextAt=0;
+  show('result-overlay',false);show('round-history',false);show('countdown',false);show('position-guides');
+  $('time-label').innerHTML='5.0 <small>SEC</small>';$('time-fill').style.transform='scaleX(1)';$('phase-label').textContent='준비되셨나요?';$('timer-caption').textContent='5초 안에 자세 완성';
+  if(ready){show(ui.play);ui.play.disabled=true;ui.play.textContent=findingLabel();}
+  renderSettings();
+}
+
 let stream=null,worker=null,mainModel=null,ready=false,loading=false,busy=false;
 let modelEpoch=0,pendingWorker=null,selectedCamera='';
 let generation=0,roundToken=0,lastFrameTime=-1,lastCapture=0,modelErrors=0,frameSentAt=0;
@@ -19,7 +59,7 @@ function beep(freq=600,duration=.1,volume=.07,delay=0){
   if(!sound||!audio)return;try{const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.type='sine';o.frequency.value=freq;const t=audio.currentTime+delay;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.start(t);o.stop(t+duration+.01);}catch{}
 }
 function victorySound(){[523,659,784,1047].forEach((f,i)=>beep(f,.28,.07,i*.12));}
-function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=poseSVG(pose);$('target-diagram').setAttribute('aria-label',pose.name+'：'+pose.instruction);$('pose-name').textContent=pose.name;$('pose-category').textContent=pose.category;$('pose-instruction').textContent=pose.instruction;$('pose-number').textContent=String(index+1).padStart(2,'0')+' / 05';}
+function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=poseSVG(pose);$('target-diagram').setAttribute('aria-label',pose.name+'：'+pose.instruction);$('pose-name').textContent=pose.name;$('pose-category').textContent=pose.category;$('pose-instruction').textContent=pose.instruction;$('pose-number').textContent=String(engine.index+1).padStart(2,'0')+' / '+String(engine.totalRounds).padStart(2,'0');}
 function resize(){const r=ui.arena.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(devicePixelRatio||1,2);for(const c of [ui.tracking,ui.fx]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);fx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(ui.arena);resize();
 function cameraState(text,live=false){$('camera-state').textContent=text;$('camera-state').classList.toggle('live',live);}
@@ -49,8 +89,8 @@ async function preparePose(gen=generation){
   try{
     await Promise.race([initializeModel(gen,epoch),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('자세 인식 준비 시간 초과'),{name:'ModelLoadTimeout'})),60000);})]);
     if(gen!==generation||epoch!==modelEpoch)return;
-    ready=true;loading=false;busy=false;lastFrameTime=-1;frameSentAt=0;cameraState('CAMERA ON',true);show('connection-panel',false);show(ui.play);ui.play.disabled=true;ui.play.textContent='두 명의 전신을 찾는 중…';
-    message('두 분 모두 머리부터 발끝까지 보이게 서 주세요. 화면 왼쪽이 Player 1, 오른쪽이 Player 2입니다.');
+    ready=true;loading=false;busy=false;lastFrameTime=-1;frameSentAt=0;cameraState('CAMERA ON',true);show('connection-panel',false);show(ui.play);ui.play.disabled=true;ui.play.textContent=findingLabel();
+    message(readyPrompt());
   }catch(e){if(gen!==generation||epoch!==modelEpoch)return;modelEpoch++;pendingWorker?.terminate();pendingWorker=null;loading=false;ready=false;cameraState('CAMERA ON',true);show('retry-model-button');connectionNotice('카메라는 연결되었습니다 · 자세 인식 준비 실패','카메라 영상은 계속 표시됩니다. 아래 버튼으로 자세 인식만 다시 준비해 주세요. 파일 버전은 최신 Chrome·Edge에서 실행해 주세요.',`MODEL: ${e?.name||'Error'} — ${String(e?.message||e).slice(0,220)}`,true);message('카메라 연결과 자세 인식 준비는 별도로 처리됩니다.');}
   finally{clearTimeout(timer);}
 }
@@ -74,35 +114,36 @@ function stopCamera(){
   generation++;modelEpoch++;ready=false;loading=false;busy=false;worker?.terminate();worker=null;pendingWorker?.terminate();pendingWorker=null;mainModel?.close();mainModel=null;show('connection-panel',false);show('retry-model-button',false);show('camera-picker-label',false);
   stream?.getTracks().forEach(t=>t.stop());stream=null;ui.video.srcObject=null;ui.video.style.display='none';players=[null,null];seenAt=[0,0];stableSince=0;winner=null;particles=[];celebrateUntil=0;autoNextAt=0;pausedPhase=null;
   engine.reset();roundToken++;liveScores=[null,null];show('start-overlay');show('position-guides');show('countdown',false);show('result-overlay',false);show('round-history',false);show(ui.play,false);show(ui.stop,false);cameraState('CAMERA OFF');ui.cameraButton.disabled=false;ui.cameraButton.innerHTML='카메라 켜고 시작 <span aria-hidden="true">↗</span>';
-  $('round-kicker').textContent='READY TO PLAY';$('round-title').textContent='몸으로 하는 한판 승부';setTarget(0);updateScores(true);updateSteps();$('time-label').innerHTML='5.0 <small>SEC</small>';$('phase-label').textContent='준비되셨나요?';$('time-fill').style.transform='scaleX(1)';$('tracking-status').textContent='카메라 한 대로 함께 플레이하세요';$('timer-caption').textContent='5초 안에 자세 완성';message('같은 자세를 5초 안에 따라 하세요. 5라운드에서 더 많이 이기면 승리!');
+  $('round-kicker').textContent='READY TO PLAY';$('round-title').textContent='몸으로 하는 한판 승부';setTarget(0);updateScores(true);updateSteps();$('time-label').innerHTML='5.0 <small>SEC</small>';$('phase-label').textContent='준비되셨나요?';$('time-fill').style.transform='scaleX(1)';$('tracking-status').textContent='카메라 한 대로 함께 플레이하세요';$('timer-caption').textContent='5초 안에 자세 완성';renderSettings();
 }
 let recovering=false;
 async function runtimeFailure(){
   if(recovering)return;recovering=true;const gen=generation;ready=false;busy=false;
   if(['playing','prepare'].includes(engine.phase)){engine.phase='retry';roundToken++;show('countdown',false);show('result-overlay',false);}
   worker?.terminate();worker=null;mainModel?.close();mainModel=null;message('인식을 다시 연결하고 있습니다. 진행 중이던 라운드는 다시 시작합니다.');cameraState('RECONNECTING');
-  try{const m=await createMainModel();if(gen!==generation){m.close();return;}mainModel=m;ready=true;cameraState('CAMERA ON',true);show(ui.play);ui.play.textContent=engine.phase==='retry'?'이 라운드 다시 도전':'대결 시작 →';}
+  try{const m=await createMainModel();if(gen!==generation){m.close();return;}mainModel=m;ready=true;cameraState('CAMERA ON',true);show(ui.play);ui.play.textContent=engine.phase==='retry'?'이 라운드 다시 도전':startLabel();}
   catch(e){if(gen===generation){ready=false;loading=false;show('retry-model-button');connectionNotice('카메라 연결 유지 · 자세 인식 재연결 필요','카메라는 정상 연결되어 있습니다. 자세 인식 다시 준비를 눌러 주세요.',`MODEL: ${e?.name||'Error'}`,true);}}
   finally{recovering=false;}
 }
 function processPoses(landmarks,timestamp,token){
-  players=assignPlayers(landmarks,ui.video.videoWidth,ui.video.videoHeight);
+  players=assignPlayers(landmarks,ui.video.videoWidth,ui.video.videoHeight,engine.playerCount);
   const now=performance.now();
-  const scores=players.map((p,i)=>{if(!p?.complete){liveScores[i]=null;return null;}seenAt[i]=now;const n=scorePose(p.points,POSES[engine.index]);liveScores[i]=n;return n;});
+  const scores=players.map((p,i)=>{if(!p?.complete){liveScores[i]=null;return null;}seenAt[i]=now;const n=scorePose(p.points,POSES[engine.poseIndex]);liveScores[i]=n;return n;});
   if(token===roundToken&&now-timestamp<900)engine.sample(scores,timestamp);
 }
-function fullyReady(now){return players.every((p,i)=>p?.complete&&now-seenAt[i]<750);}
+function fullyReady(now){return players.length===engine.playerCount&&players.every((p,i)=>p?.complete&&now-seenAt[i]<750);}
 function startRound(){
-  if(!ready||!fullyReady(performance.now())){message('두 분의 전신이 모두 인식되면 시작할 수 있습니다. 발끝까지 화면 안에 넣어 주세요.');return false;}
+  if(!ready||!fullyReady(performance.now())){message(readyPrompt());return false;}
   if(engine.phase==='finished'){engine.reset();show('round-history',false);winner=null;particles=[];celebrateUntil=0;}
   if(!engine.prepare(performance.now()))return false;
   roundToken++;winner=null;celebrateUntil=0;autoNextAt=0;liveScores=[null,null];previousCount=-1;show('result-overlay',false);show(ui.play,false);show('position-guides',false);show('countdown');$('countdown').classList.remove('active');$('countdown-caption').textContent='곧 시작합니다';
-  setTarget(engine.index);$('round-kicker').textContent='MATCH IN PROGRESS';$('round-title').textContent=`Round ${engine.index+1} / 5`;$('phase-label').textContent='준비 시간';message('3초 뒤 시작합니다. 오른쪽 자세를 확인해 주세요.');updateSteps();updateScores(true);return true;
+  setTarget(engine.poseIndex);updateSettingLock();$('round-kicker').textContent=solo()?'PRACTICE IN PROGRESS':'MATCH IN PROGRESS';$('round-title').textContent=`Round ${engine.index+1} / ${engine.totalRounds}`;$('phase-label').textContent='준비 시간';message('3초 뒤 시작합니다. 제시된 자세를 확인해 주세요.');updateSteps();updateScores(true);return true;
 }
 function updateSteps(){[...$('round-steps').children].forEach((li,i)=>{li.classList.toggle('done',i<engine.rounds.length);li.classList.toggle('current',i===engine.rounds.length&&engine.phase!=='finished');li.setAttribute('aria-label',`Round ${i+1}${i<engine.rounds.length?' 완료':''}`);});}
 function updateScores(reset=false){
-  const result=matchResult(engine.rounds);
-  for(let i=0;i<2;i++){
+  const practice=solo()?practiceResult(engine.rounds):null;
+  const result=solo()?{wins:[0],averages:[practice.average]}:matchResult(engine.rounds);
+  for(let i=0;i<engine.playerCount;i++){
     let value=null;
     if(engine.phase==='playing')value=engine.windows[i].best??liveScores[i];
     else if(['result','finished'].includes(engine.phase))value=engine.rounds.at(-1)?.scores[i];
@@ -112,21 +153,44 @@ function updateScores(reset=false){
     if(engine.phase==='finished')status.textContent=`최종 평균 ${result.averages[i].toFixed(1)}%`;
     else if(engine.phase==='result')status.textContent='이번 라운드 최고 유지 점수';
     else if(engine.phase==='playing')status.textContent=players[i]?.complete?'최고 유지 점수':'전신을 화면 안에 넣어 주세요';
-    else status.textContent=reset?i===0?'왼쪽 플레이어':'오른쪽 플레이어':players[i]?.complete?'전신 인식 완료':'발끝까지 보이게 서 주세요';
+    else status.textContent=reset?solo()?'내 자세 점수':i===0?'왼쪽 플레이어':'오른쪽 플레이어':players[i]?.complete?'전신 인식 완료':'발끝까지 보이게 서 주세요';
   }
 }
-function renderHistory(){const history=$('round-history');history.replaceChildren();engine.rounds.forEach((r,i)=>{const item=document.createElement('div');item.className='history-item';const rw=roundWinner(r.scores);item.innerHTML=`<span>ROUND ${i+1}</span><p><b>${r.scores[0].toFixed(1)}%</b><b>${r.scores[1].toFixed(1)}%</b></p><small>${rw===null?'무승부':`P${rw+1} 승리`}</small>`;history.appendChild(item);});show(history);}
+function renderHistory(){
+  const history=$('round-history');history.replaceChildren();
+  engine.rounds.forEach((r,i)=>{const item=document.createElement('div');item.className='history-item';
+    const score=r.scores[0].toFixed(1),rw=solo()?null:roundWinner(r.scores);
+    item.innerHTML=solo()?`<span>ROUND ${i+1}</span><p><b>${score}%</b></p><small>${POSES.find(p=>p.id===r.pose).name}</small>`:`<span>ROUND ${i+1}</span><p><b>${score}%</b><b>${r.scores[1].toFixed(1)}%</b></p><small>${rw===null?'무승부':`P${rw+1} 승리`}</small>`;
+    history.appendChild(item);
+  });show(history);
+}
 function finishRound(state,now){
   show('countdown',false);show('result-overlay');$('result-overlay').classList.remove('final');$('time-fill').style.transform='scaleX(0)';$('time-label').innerHTML='0.0 <small>SEC</small>';show(ui.play);ui.play.disabled=false;
   if(state==='retry'){
-    $('result-kicker').textContent='TRY AGAIN';$('result-title').textContent='한 번 더!';$('result-detail').textContent='두 명의 전신 인식이 충분하지 않았어요.';$('phase-label').textContent='같은 라운드 재도전';ui.play.textContent='이 라운드 다시 도전 →';message('전신이 보이도록 물러나 주세요. 약 0.4초 이상 자세를 유지하면 점수가 기록됩니다.');return;
+    $('result-kicker').textContent='TRY AGAIN';$('result-title').textContent='한 번 더!';$('result-detail').textContent=solo()?'전신 인식이 충분하지 않았어요.':'두 명의 전신 인식이 충분하지 않았어요.';$('phase-label').textContent='같은 라운드 재도전';ui.play.textContent='이 라운드 다시 도전 →';message('전신이 보이도록 물러나 주세요. 약 0.4초 이상 자세를 유지하면 점수가 기록됩니다.');return;
+  }
+  updateSettingLock();
+  if(solo()){
+    const score=engine.rounds.at(-1).scores[0],result=practiceResult(engine.rounds);
+    winner=0;celebrateUntil=now+3200;renderHistory();updateScores();updateSteps();victorySound();
+    $('result-kicker').textContent=`ROUND ${engine.index+1} · PRACTICE`;$('result-title').textContent=`${score.toFixed(1)}%`;
+    $('result-detail').textContent='자세 유사도 · 최고 유지 점수';
+    if(state==='finished'){
+      $('result-overlay').classList.add('final');celebrateUntil=now+5000;
+      $('result-kicker').textContent='PRACTICE COMPLETE';$('result-title').textContent=`${result.average.toFixed(1)}%`;
+      $('result-detail').textContent=`전체 평균 · 최고 ${result.best.toFixed(1)}%`;
+      $('round-kicker').textContent='PRACTICE COMPLETE';$('round-title').textContent=`${engine.totalRounds}판 연습 · 최종 기록`;
+      $('phase-label').textContent='연습 완료';ui.play.textContent='다시 연습하기 ↗';
+      message(`연습 완료! 평균 ${result.average.toFixed(1)}%, 최고 ${result.best.toFixed(1)}%입니다. 시작 자세를 바꿔 다시 도전해 보세요.`);
+    }else{autoNextAt=now+5000;ui.play.textContent='다음 자세 →';$('phase-label').textContent='연습 결과';message('잠시 후 다음 자세 연습이 시작됩니다.');}
+    return;
   }
   const scores=engine.rounds.at(-1).scores;winner=roundWinner(scores);celebrateUntil=now+3200;renderHistory();updateScores();updateSteps();victorySound();
   $('result-kicker').textContent=`ROUND ${engine.index+1} RESULT`;$('result-title').textContent=winner===null?'DRAW':`PLAYER ${winner+1} WINS`;$('result-detail').textContent=`${scores[0].toFixed(1)}%  :  ${scores[1].toFixed(1)}%`;
   if(state==='finished'){
     const result=matchResult(engine.rounds);winner=result.winner;celebrateUntil=Infinity;$('result-overlay').classList.add('final');$('result-kicker').textContent=winner===null?'BOTH PLAYERS':`PLAYER ${winner+1}`;$('result-title').textContent=winner===null?'DOUBLE VICTORY':'VICTORY';$('result-detail').textContent=winner===null?'완벽한 무승부! 두 분 모두 승리!':`${result.wins[winner]} ROUND WINS · 평균 ${result.averages[winner].toFixed(1)}%`;
-    $('round-kicker').textContent='MATCH COMPLETE';$('round-title').textContent='5라운드 · 최종 결과';$('phase-label').textContent='대결 완료';ui.play.textContent='다시 대결하기 ↗';
-    message(result.tiedWins?(winner===null?'승수와 평균 점수가 같아 공동 승리입니다!':'승수가 같아 전체 라운드 평균 점수로 최종 승자를 가렸습니다.'):`Player ${winner+1} 승리! 5라운드에서 더 많은 승리를 가져갔습니다.`);
+    $('round-kicker').textContent='MATCH COMPLETE';$('round-title').textContent=`${engine.totalRounds}라운드 · 최종 결과`;$('phase-label').textContent='대결 완료';ui.play.textContent='다시 대결하기 ↗';
+    message(result.tiedWins?(winner===null?'승수와 평균 점수가 같아 공동 승리입니다!':'승수가 같아 전체 라운드 평균 점수로 최종 승자를 가렸습니다.'):`Player ${winner+1} 승리! ${engine.totalRounds}라운드 대결을 마쳤습니다.`);
   }else{autoNextAt=now+5000;ui.play.textContent='다음 라운드 →';$('phase-label').textContent='라운드 결과';message('잠시 후 다음 라운드가 시작됩니다. 같은 자리를 유지해 주세요.');}
 }
 function mapPoint(p){const vw=ui.video.videoWidth||1280,vh=ui.video.videoHeight||720;const scale=Math.min(W/vw,H/vh);return{x:(W-vw*scale)/2+p.x*scale,y:(H-vh*scale)/2+p.y*scale};}
@@ -165,10 +229,10 @@ function loop(now){
     const canStart=both&&now-stableSince>=600;
     if(['ready','retry','result','finished'].includes(engine.phase)){
       ui.play.disabled=!canStart;
-      if(engine.phase==='ready')ui.play.textContent=canStart?'대결 시작 →':'두 명의 전신을 찾는 중…';
+      if(engine.phase==='ready')ui.play.textContent=canStart?startLabel():findingLabel();
     }
-    if(engine.phase==='ready'||engine.phase==='retry'){$('tracking-status').textContent=both?'두 명 모두 인식되었습니다':'머리부터 발끝까지 화면 안에 넣어 주세요';show('position-guides',!both);}
-    else $('tracking-status').textContent=both?'2 PLAYERS TRACKED':'전신이 가려지지 않게 해 주세요';
+    if(engine.phase==='ready'||engine.phase==='retry'){$('tracking-status').textContent=both?(solo()?'전신 인식 완료 · 연습 준비 완료':'두 명 모두 인식되었습니다'):'머리부터 발끝까지 화면 안에 넣어 주세요';show('position-guides',!both);}
+    else $('tracking-status').textContent=both?(solo()?'1 PLAYER TRACKED':'2 PLAYERS TRACKED'):'전신이 가려지지 않게 해 주세요';
     const change=engine.tick(now);
     if(change==='playing'){roundToken++;previousCount=-1;$('countdown').classList.add('active');$('phase-label').textContent='자세를 유지하세요';message('그림과 같은 방향으로 따라 하세요. 5초 안에 가장 잘 유지한 자세가 기록됩니다.');beep(1000,.15);}
     if(['result','finished','retry'].includes(change))finishRound(change,now);
@@ -194,6 +258,9 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>{generation++;stream?.getTracks().forEach(t=>t.stop());worker?.terminate();mainModel?.close();});
 // Optional, progressive enhancement for browsers implementing WebMCP.
-if(document.modelContext?.registerTool){const controller=new AbortController();const read=()=>({phase:engine.phase,round:engine.index+1,totalRounds:5,cameraReady:ready,playersDetected:players.map(p=>!!p?.complete),rounds:engine.rounds,...matchResult(engine.rounds)});for(const tool of [{name:'get_copy_pose_match',description:'Read the current Copy Pose match, scores, and camera readiness.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');return read();}},{name:'start_copy_pose_round',description:'Start the next Copy Pose round only after both people are visible and the camera is ready. Camera permission must be granted using the visible button.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');if(!startRound())throw new Error('Camera and both full bodies must be ready, and no round may be active.');return read();}}]){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}catch{}}window.addEventListener('pagehide',()=>controller.abort(),{once:true});}
-setTarget(0);requestAnimationFrame(loop);
+if(document.modelContext?.registerTool){const controller=new AbortController();const read=()=>({phase:engine.phase,round:engine.index+1,totalRounds:engine.totalRounds,playerCount:engine.playerCount,mode:solo()?'practice':'duel',cameraReady:ready,playersDetected:players.map(p=>!!p?.complete),rounds:engine.rounds,...(solo()?practiceResult(engine.rounds):matchResult(engine.rounds))});for(const tool of [{name:'get_copy_pose_match',description:'Read the current Copy Pose match, scores, and camera readiness.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');return read();}},{name:'start_copy_pose_round',description:'Start the next Copy Pose round only after the selected number of players are visible and the camera is ready. Camera permission must be granted using the visible button.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');if(!startRound())throw new Error('Camera and all required full bodies must be ready, and no round may be active.');return read();}}]){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}catch{}}window.addEventListener('pagehide',()=>controller.abort(),{once:true});}
+document.querySelectorAll('[data-players]').forEach(b=>b.addEventListener('click',()=>changeSettings({playerCount:Number(b.dataset.players),poseOffset:Number(b.dataset.players)===1?Number($('practice-pose').value):0})));
+document.querySelectorAll('[data-rounds]').forEach(b=>b.addEventListener('click',()=>changeSettings({totalRounds:Number(b.dataset.rounds)})));
+$('practice-pose').addEventListener('change',e=>changeSettings({poseOffset:Number(e.target.value)}));
+renderSettings();requestAnimationFrame(loop);
 const initialProblem=cameraPreflight(cameraEnvironment());if(initialProblem)connectionNotice('카메라 실행 환경을 확인해 주세요',initialProblem.message,initialProblem.code,true);

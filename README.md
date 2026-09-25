@@ -1,6 +1,6 @@
 # copy pose
 
-Two-player, same-camera, five-round pose matching game. Static ES module application, Korean UI. All camera frames and pose inference remain on the player's device. No microphone, frame upload, or backend database.
+One-player practice or two-player same-camera pose matching game. Choose 1, 3, or 5 rounds. Static ES module application, Korean UI. All camera frames and pose inference remain on the player's device. No microphone, frame upload, or backend database.
 
 ## Gameplay
 
@@ -10,8 +10,12 @@ Two-player, same-camera, five-round pose matching game. Static ES module applica
 - Coordinates are mirrored into display space and corrected for video aspect ratio. Segment directions and elbow/knee angles are compared, removing translation and body-scale differences.
 - Scores are the maximum mean of a 350–650 ms valid sample window with at least three observations. No random scores or face-based scoring.
 - Missing full-body data causes a retry instead of awarding a false score or a default win.
-- Five rounds always play. Round wins determine the match; average percentage breaks a tied win count; equal averages produce shared victory.
+- The selected 1, 3, or 5 rounds always play. Round wins determine the match; average percentage breaks a tied win count; equal averages produce shared victory.
 - Final winner receives a tracked, glowing body envelope and canvas fireworks. Reduced-motion preference reduces animation.
+
+## Practice mode
+
+Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Choose a starting pose, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
 
 ## Inference
 
