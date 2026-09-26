@@ -76,12 +76,13 @@ export function practiceResult(rounds){
   return {average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10:0,best:scores.length?Math.max(...scores):null,completed:rounds.length};
 }
 export class MatchEngine{
-  constructor({random=Math.random,...options}={}){this.random=random;this.playerCount=2;this.totalRounds=5;this.poseOffset=0;this.reset(options);}
+  constructor({random=Math.random,...options}={}){this.random=random;this.playerCount=2;this.totalRounds=5;this.poseOffset=null;this.reset(options);}
   reset({playerCount=this.playerCount,totalRounds=this.totalRounds,poseOffset=this.poseOffset}={}){
-    if(![1,2].includes(playerCount)||![1,3,5].includes(totalRounds)||!Number.isInteger(poseOffset)||poseOffset<0||poseOffset>=POSES.length)throw new RangeError('Invalid game settings');
+    if(![1,2].includes(playerCount)||![1,3,5].includes(totalRounds)||(poseOffset!==null&&(!Number.isInteger(poseOffset)||poseOffset<0||poseOffset>=POSES.length)))throw new RangeError('Invalid game settings');
     this.playerCount=playerCount;this.totalRounds=totalRounds;this.poseOffset=poseOffset;
-    this.poseOrder=POSES.map((_,i)=>(i+poseOffset)%POSES.length);
-    if(playerCount===2)for(let i=this.poseOrder.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[this.poseOrder[i],this.poseOrder[j]]=[this.poseOrder[j],this.poseOrder[i]];}
+    this.poseOrder=POSES.map((_,i)=>i).filter(i=>i!==poseOffset);
+    for(let i=this.poseOrder.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[this.poseOrder[i],this.poseOrder[j]]=[this.poseOrder[j],this.poseOrder[i]];}
+    if(poseOffset!==null)this.poseOrder.unshift(poseOffset);
     this.rounds=[];this.phase='ready';this.index=0;this.end=0;this.windows=Array.from({length:playerCount},()=>new ScoreWindow());
   }
   get poseIndex(){return this.poseOrder[this.index];}

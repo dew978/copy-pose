@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#111310"><meta name="description" content="1인 연습과 2인 대결을 즐기는 자세 맞추기 게임. 1판·3판·5판을 선택하세요.">
   <title>copy pose — 동작 맞추기</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111310'/%3E%3Cpath d='M27 17H16v30h11M37 17h11v30H37' fill='none' stroke='%23d9ff58' stroke-width='7'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./styles.css?v=4">
+  <link rel="stylesheet" href="./styles.css?v=5">
 </head>
 <body>
   <div class="app">
@@ -19,7 +19,7 @@
       <section class="game-settings" aria-label="게임 설정">
         <fieldset id="mode-settings"><legend>플레이 방식</legend><div class="option-buttons"><button type="button" data-players="2" aria-pressed="true">2인 대결</button><button type="button" data-players="1" aria-pressed="false">1인 연습</button></div></fieldset>
         <fieldset id="round-settings"><legend>진행 횟수</legend><div class="option-buttons"><button type="button" data-rounds="1" aria-pressed="false">단판</button><button type="button" data-rounds="3" aria-pressed="false">3판제</button><button type="button" data-rounds="5" aria-pressed="true">5판제</button></div></fieldset>
-        <label id="practice-pose-label" class="practice-picker hidden">시작 자세<select id="practice-pose"><option value="0">슈퍼스타</option><option value="1">비행기</option><option value="2">골인!</option><option value="3">번개 포즈</option><option value="4">디스코 타임</option><option value="5">만세!</option><option value="6">로봇 포즈</option><option value="7">히어로</option><option value="8">외발 비행기</option><option value="9">안녕 포즈</option></select></label>
+        <label id="practice-pose-label" class="practice-picker">시작 자세<select id="practice-pose"><option value="random" selected>랜덤 (기본)</option><option value="0">슈퍼스타</option><option value="1">비행기</option><option value="2">골인!</option><option value="3">번개 포즈</option><option value="4">디스코 타임</option><option value="5">만세!</option><option value="6">로봇 포즈</option><option value="7">히어로</option><option value="8">외발 비행기</option><option value="9">안녕 포즈</option></select></label>
         <p class="auto-start-note">전신 인식 → 3초 뒤 자동 시작 · 10가지 포즈</p>
         <p id="settings-hint">10종 중 랜덤으로 5판을 진행합니다. 라운드마다 5초!</p>
       </section>
@@ -51,9 +51,9 @@
       <div class="game-controls"><p id="game-message" aria-live="polite">같은 자세를 5초 안에 따라 하세요. 5라운드에서 더 많이 이기면 승리!</p><div><label id="camera-picker-label" class="camera-picker hidden">카메라<select id="camera-picker" aria-label="사용할 카메라"></select></label><button id="stop-button" class="text-button hidden">그만하기</button><button id="play-button" class="primary-button hidden">대결 시작 <span aria-hidden="true">→</span></button></div></div>
       <div id="round-history" class="round-history hidden" aria-label="라운드별 결과"></div>
       <footer><span>MOVE. MATCH. WIN.</span><span>전신을 화면 안에 · 서로 겹치지 않게 · 화면과 같은 방향으로</span><button id="rules-button" class="text-button">점수 계산 방법</button></footer>
-      <dialog id="rules-dialog"><button id="close-rules" class="dialog-close" aria-label="닫기">×</button><span class="mini-label">HOW TO PLAY</span><h2>자세를 맞추고, 점수를 겨루세요.</h2><ol><li>화면 왼쪽은 Player 1, 오른쪽은 Player 2입니다. 대결 중에는 자리를 바꾸지 마세요.</li><li>카메라를 켠 뒤 필요한 인원 모두의 전신이 보이면 3초 뒤 자동으로 시작합니다. 인식이 끊기면 다시 기다립니다. 시작 버튼을 누르러 가까이 오지 않아도 됩니다.</li><li>라운드마다 5초 동안 제시된 그림과 같은 방향으로 자세를 맞춰 주세요. 카메라 화면은 거울처럼 표시됩니다.</li><li>팔·다리 방향과 관절 각도를 비교합니다. 키나 화면 속 위치 차이는 보정합니다.</li><li>순간적인 오인식을 줄이기 위해 약 0.4초 동안 유지한 자세의 평균 중 최고 점수를 사용합니다.</li><li>단판·3판·5판 중 선택한 라운드를 모두 진행하고, 승수가 더 많으면 최종 승리합니다. 승수가 같으면 유효 라운드 평균 점수로 결정하며, 평균도 같으면 공동 승리입니다.</li><li>대결은 둘 중 한 명이라도, 연습은 본인의 전신 인식이 충분하지 않으면 해당 라운드를 다시 진행합니다.</li><li>포즈는 총 10종입니다. 2인 대결은 중복 없이 랜덤 출제합니다. 1인 연습은 화면 어느 위치에서도 혼자 시작할 수 있습니다. 시작 자세를 선택하고 라운드별 점수와 최종 평균·최고 점수를 확인하세요. 선택한 시작 자세부터 순서대로 연습합니다.</li></ol><p>유사도는 게임용 추정 점수입니다. 카메라 각도·조명·가려짐에 따라 달라질 수 있습니다.</p></dialog>
+      <dialog id="rules-dialog"><button id="close-rules" class="dialog-close" aria-label="닫기">×</button><span class="mini-label">HOW TO PLAY</span><h2>자세를 맞추고, 점수를 겨루세요.</h2><ol><li>화면 왼쪽은 Player 1, 오른쪽은 Player 2입니다. 대결 중에는 자리를 바꾸지 마세요.</li><li>카메라를 켠 뒤 필요한 인원 모두의 전신이 보이면 3초 뒤 자동으로 시작합니다. 인식이 끊기면 다시 기다립니다. 시작 버튼을 누르러 가까이 오지 않아도 됩니다.</li><li>라운드마다 5초 동안 제시된 그림과 같은 방향으로 자세를 맞춰 주세요. 카메라 화면은 거울처럼 표시됩니다.</li><li>팔·다리 방향과 관절 각도를 비교합니다. 키나 화면 속 위치 차이는 보정합니다.</li><li>순간적인 오인식을 줄이기 위해 약 0.4초 동안 유지한 자세의 평균 중 최고 점수를 사용합니다.</li><li>단판·3판·5판 중 선택한 라운드를 모두 진행하고, 승수가 더 많으면 최종 승리합니다. 승수가 같으면 유효 라운드 평균 점수로 결정하며, 평균도 같으면 공동 승리입니다.</li><li>대결은 둘 중 한 명이라도, 연습은 본인의 전신 인식이 충분하지 않으면 해당 라운드를 다시 진행합니다.</li><li>포즈는 총 10종입니다. 1인 연습과 2인 대결 모두 기본적으로 중복 없이 랜덤 출제합니다. 1인 연습은 화면 어느 위치에서도 혼자 시작할 수 있습니다. 시작 자세를 선택하고 라운드별 점수와 최종 평균·최고 점수를 확인하세요. 특정 시작 자세를 선택하면 첫 라운드에 나오며, 이후 자세는 중복 없이 랜덤 출제합니다.</li></ol><p>유사도는 게임용 추정 점수입니다. 카메라 각도·조명·가려짐에 따라 달라질 수 있습니다.</p></dialog>
     </main>
   </div>
-  <script type="module" src="./app.mjs?v=4"></script>
+  <script type="module" src="./app.mjs?v=5"></script>
 </body>
 </html>

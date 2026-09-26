@@ -36,11 +36,25 @@ test('practice missing tracking retries and cannot record a score from a single 
   const g=new MatchEngine({playerCount:1,totalRounds:1});g.prepare(0);g.tick(3000);g.sample([99],3100);g.sample([],3400);assert.equal(g.tick(8000),'retry');assert.equal(g.rounds.length,0);
   assert.equal(completeRound(g,9000,[83]),'finished');assert.equal(practiceResult(g.rounds).best,83);
 });
-test('practice start pose wraps across the pose list and reset clears old results',()=>{
-  const g=new MatchEngine({playerCount:1,totalRounds:3,poseOffset:9});
+test('chosen start pose is followed by random distinct poses and reset clears old results',()=>{
+  const g=new MatchEngine({playerCount:1,totalRounds:3,poseOffset:9,random:()=>0});
   for(let i=0;i<3;i++)completeRound(g,i*9000,[75]);
-  assert.deepEqual(g.rounds.map(r=>r.pose),[POSES[9].id,POSES[0].id,POSES[1].id]);
+  assert.deepEqual(g.rounds.map(r=>r.pose),[POSES[9].id,POSES[1].id,POSES[2].id]);
   g.reset({playerCount:2,totalRounds:1,poseOffset:0});assert.equal(g.index,0);assert.equal(g.poseOffset,0);assert.ok(g.poseIndex>=0&&g.poseIndex<POSES.length);assert.equal(g.phase,'ready');assert.equal(g.windows.length,2);assert.ok(g.windows.every(w=>w.best===null));assert.deepEqual(g.rounds,[]);
+});
+for(const playerCount of [1,2])test(`${playerCount}-player defaults to random and can select or restore a random start`,()=>{
+  let randomValue=0;
+  const g=new MatchEngine({playerCount,random:()=>randomValue});
+  assert.equal(g.poseOffset,null);assert.equal(g.poseIndex,1);
+  assert.equal(new Set(g.poseOrder).size,POSES.length);
+  const previous=[...g.poseOrder];randomValue=.999;g.reset();
+  assert.equal(g.poseOffset,null);assert.notDeepEqual(g.poseOrder,previous);
+  for(let poseOffset=0;poseOffset<POSES.length;poseOffset++){
+    g.reset({poseOffset});assert.equal(g.poseIndex,poseOffset);
+    assert.equal(new Set(g.poseOrder).size,POSES.length);
+  }
+  g.reset({poseOffset:null});assert.equal(g.poseOffset,null);assert.equal(g.poseIndex,0);
+  g.reset({playerCount:playerCount===1?2:1});assert.equal(g.poseOffset,null);
 });
 test('unsupported configurations are rejected',()=>{
   for(const options of [{playerCount:0},{playerCount:3},{totalRounds:2},{poseOffset:10}])assert.throws(()=>new MatchEngine(options),RangeError);

@@ -1,4 +1,4 @@
-import {POSES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=4';
+import {POSES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=5';
 import {cameraPreflight,requestCameraStream,attachCameraVideo,cameraErrorMessage} from './camera-utils.mjs';
 import {createPoseModel} from './model-loader.mjs';
 const $=id=>document.getElementById(id);
@@ -11,13 +11,14 @@ const findingLabel=()=>solo()?'전신을 찾는 중…':'두 명의 전신을 �
 function settingsLocked(){return !['ready','finished'].includes(engine.phase);}
 function updateSettingLock(){
   const locked=settingsLocked();$('mode-settings').disabled=locked;$('round-settings').disabled=locked;$('practice-pose').disabled=locked;
-  $('settings-hint').textContent=locked?'진행 중에는 설정이 고정됩니다. 바꾸려면 그만하기를 눌러 주세요.':solo()?`10종 중 선택한 자세부터 ${engine.totalRounds}판 연습합니다. 라운드마다 5초!`:`10종 중 랜덤으로 ${engine.totalRounds}판을 진행합니다. 라운드마다 5초!`;
+  const selection=engine.poseOffset===null?'10종 중 중복 없이 랜덤 출제합니다.':`첫 자세: ${POSES[engine.poseOffset].name}.${engine.totalRounds>1?' 이후 자세는 중복 없이 랜덤 출제합니다.':''}`;
+  $('settings-hint').textContent=locked?'진행 중에는 설정이 고정됩니다. 바꾸려면 그만하기를 눌러 주세요.':`${engine.totalRounds}판 ${solo()?'연습':'대결'} · ${selection} 라운드마다 5초!`;
 }
 function renderSettings(){
   document.body.classList.toggle('solo-mode',solo());
   document.querySelectorAll('[data-players]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.players)===engine.playerCount));
   document.querySelectorAll('[data-rounds]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.rounds)===engine.totalRounds));
-  show('practice-pose-label',solo());
+  $('practice-pose').value=engine.poseOffset===null?'random':String(engine.poseOffset);
   $('round-steps').innerHTML=Array.from({length:engine.totalRounds},(_,i)=>`<li>${String(i+1).padStart(2,'0')}</li>`).join('');
   $('round-steps').setAttribute('aria-label',`총 ${engine.totalRounds}라운드`);
   $('round-history').style.gridTemplateColumns=`repeat(${engine.totalRounds},minmax(0,1fr))`;
@@ -274,8 +275,8 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pagehide',()=>{generation++;stream?.getTracks().forEach(t=>t.stop());worker?.terminate();mainModel?.close();});
 // Optional, progressive enhancement for browsers implementing WebMCP.
 if(document.modelContext?.registerTool){const controller=new AbortController();const read=()=>({phase:engine.phase,round:engine.index+1,totalRounds:engine.totalRounds,playerCount:engine.playerCount,mode:solo()?'practice':'duel',cameraReady:ready,automaticStart:true,poseCount:POSES.length,playersDetected:players.map(p=>!!p?.complete),rounds:engine.rounds,...(solo()?practiceResult(engine.rounds):matchResult(engine.rounds))});for(const tool of [{name:'get_copy_pose_match',description:'Read the current Copy Pose match, scores, and camera readiness.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');return read();}},{name:'start_copy_pose_round',description:'Arm the next round or a replay. It starts automatically after all required players are visible for 3 seconds. Camera permission must be granted using the visible button.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('Expected an empty object');if(!startRound())throw new Error('Camera must be ready and no round may be active.');return read();}}]){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}catch{}}window.addEventListener('pagehide',()=>controller.abort(),{once:true});}
-document.querySelectorAll('[data-players]').forEach(b=>b.addEventListener('click',()=>changeSettings({playerCount:Number(b.dataset.players),poseOffset:Number(b.dataset.players)===1?Number($('practice-pose').value):0})));
+document.querySelectorAll('[data-players]').forEach(b=>b.addEventListener('click',()=>changeSettings({playerCount:Number(b.dataset.players)})));
 document.querySelectorAll('[data-rounds]').forEach(b=>b.addEventListener('click',()=>changeSettings({totalRounds:Number(b.dataset.rounds)})));
-$('practice-pose').addEventListener('change',e=>changeSettings({poseOffset:Number(e.target.value)}));
+$('practice-pose').addEventListener('change',e=>changeSettings({poseOffset:e.target.value==='random'?null:Number(e.target.value)}));
 renderSettings();requestAnimationFrame(loop);
 const initialProblem=cameraPreflight(cameraEnvironment());if(initialProblem)connectionNotice('카메라 실행 환경을 확인해 주세요',initialProblem.message,initialProblem.code,true);

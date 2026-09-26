@@ -15,9 +15,9 @@ One-player practice or two-player same-camera pose matching game. Choose 1, 3, o
 
 ## Practice mode
 
-Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Choose one of ten starting poses, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
+Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Poses are random by default. Optionally choose one of ten starting poses, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
 
-Two-player matches draw poses from the full ten-pose pool without repeats within a match. Practice proceeds sequentially from the selected pose. Round counts remain 1, 3, and 5.
+Both modes default to random poses from the full ten-pose pool without repeats within a session. The start-pose picker is available in both modes: a manual choice pins the first round, with remaining poses shuffled. Selecting Random restores the default behavior. Replays reshuffle while preserving the chosen setting. Round counts remain 1, 3, and 5.
 
 ## Inference
 
