@@ -19,6 +19,10 @@ Select 1인 연습 before starting. A single full body can be tracked anywhere i
 
 Both modes default to random poses from the full ten-pose pool without repeats within a session. The start-pose picker is available in both modes: a manual choice pins the first round, with remaining poses shuffled. Selecting Random restores the default behavior. Replays reshuffle while preserving the chosen setting. Round counts remain 1, 3, and 5.
 
+## Screen layout
+
+The main interface is sized for 16:9 desktop monitors: a compact header/settings bar, camera and pose panels, and score cards. The camera uses contain sizing and the overlay shares the same bounds, preserving the full frame. Wide short viewports retain separate camera/pose columns; narrow portrait viewports stack them. Repeated instructions are removed from the main view, with details available through the header help button.
+
 ## Inference
 
 MediaPipe Tasks Vision 0.10.21, Pose Landmarker Full, two poses, GPU with CPU fallback. Hosted mode uses a classic worker with main-thread fallback. The downloadable HTML embeds the JavaScript, baseline WASM and model, uses lazy local Blob URLs and the main-thread GPU path, and makes no model/font network requests. Camera permission is requested before any audio or model waits. Camera video remains available on model failure, with a separate retry. Permission, video and model errors are distinguished. Late permission grants after cancellation are explicitly released.

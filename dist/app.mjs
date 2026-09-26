@@ -5,14 +5,12 @@ const $=id=>document.getElementById(id);
 const ui={video:$('camera'),arena:$('arena'),tracking:$('tracking-canvas'),fx:$('fx-canvas'),cameraButton:$('camera-button'),play:$('play-button'),stop:$('stop-button'),message:$('game-message')};
 const engine=new MatchEngine();
 const solo=()=>engine.playerCount===1;
-const readyPrompt=()=>solo()?'전신이 보이도록 서 계시면 3초 뒤 자동으로 시작합니다. 시작 버튼을 누르러 오지 않으셔도 됩니다.':'두 분의 전신이 모두 보이면 3초 뒤 자동으로 시작합니다. 화면 왼쪽이 Player 1, 오른쪽이 Player 2입니다.';
+const readyPrompt=()=>solo()?'전신이 보이면 3초 뒤 자동 시작':'두 명의 전신이 보이면 3초 뒤 자동 시작';
 const startLabel=()=>solo()?'연습 자동 시작 대기':'대결 자동 시작 대기';
 const findingLabel=()=>solo()?'전신을 찾는 중…':'두 명의 전신을 찾는 중…';
 function settingsLocked(){return !['ready','finished'].includes(engine.phase);}
 function updateSettingLock(){
   const locked=settingsLocked();$('mode-settings').disabled=locked;$('round-settings').disabled=locked;$('practice-pose').disabled=locked;
-  const selection=engine.poseOffset===null?'10종 중 중복 없이 랜덤 출제합니다.':`첫 자세: ${POSES[engine.poseOffset].name}.${engine.totalRounds>1?' 이후 자세는 중복 없이 랜덤 출제합니다.':''}`;
-  $('settings-hint').textContent=locked?'진행 중에는 설정이 고정됩니다. 바꾸려면 그만하기를 눌러 주세요.':`${engine.totalRounds}판 ${solo()?'연습':'대결'} · ${selection} 라운드마다 5초!`;
 }
 function renderSettings(){
   document.body.classList.toggle('solo-mode',solo());
@@ -22,17 +20,14 @@ function renderSettings(){
   $('round-steps').innerHTML=Array.from({length:engine.totalRounds},(_,i)=>`<li>${String(i+1).padStart(2,'0')}</li>`).join('');
   $('round-steps').setAttribute('aria-label',`총 ${engine.totalRounds}라운드`);
   $('round-history').style.gridTemplateColumns=`repeat(${engine.totalRounds},minmax(0,1fr))`;
-  $('start-badge').textContent=`${engine.totalRounds} ${engine.totalRounds===1?'ROUND':'ROUNDS'} · 5 SECONDS`;
-  $('start-title').innerHTML=solo()?'나만의 연습,<br><em>더 높은 점수.</em>':'같은 자세,<br><em>다른 점수.</em>';
   $('start-instruction').textContent=readyPrompt();
-  document.querySelector('.header-tag').textContent=solo()?'ONE PLAYER. YOUR PACE.':'TWO PLAYERS. ONE POSE.';
   document.querySelector('.zone-left').innerHTML=solo()?'<span class="player-dot p1"></span>PRACTICE':'<span class="player-dot p1"></span>PLAYER 1';
   document.querySelector('#position-guides>div:first-child p').textContent=solo()?'전신이 보이게 서 주세요':'왼쪽에 서 주세요';
   document.querySelector('.player-one h2').textContent=solo()?'MY SCORE':'PLAYER 1';
   ui.arena.setAttribute('aria-label',solo()?'1인 연습 카메라 화면':'두 명의 카메라 플레이 화면');
-  $('round-kicker').textContent=solo()?'PRACTICE MODE':'READY TO PLAY';
-  $('round-title').textContent=solo()?'혼자 연습하고, 기록을 높이세요':'몸으로 하는 한판 승부';
-  $('tracking-status').textContent=solo()?'혼자 화면 전체에서 연습하세요':'카메라 한 대로 함께 플레이하세요';
+  $('round-kicker').textContent=solo()?'연습 · 대기':'대결 · 대기';
+  $('round-title').textContent=`Round 1 / ${engine.totalRounds}`;
+  $('tracking-status').textContent=solo()?'전신을 보여 주세요':'두 명의 전신을 보여 주세요';
   setTarget(engine.poseIndex);updateSteps();updateScores(true);updateSettingLock();
   message(solo()?`${engine.totalRounds}판 연습 · 5초 안에 자세를 따라 하고 점수를 확인하세요.`:`${engine.totalRounds}판 대결 · 5초 안에 자세를 따라 하고 더 많은 라운드에서 승리하세요!`);
 }
@@ -60,7 +55,7 @@ function beep(freq=600,duration=.1,volume=.07,delay=0){
   if(!sound||!audio)return;try{const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.type='sine';o.frequency.value=freq;const t=audio.currentTime+delay;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.start(t);o.stop(t+duration+.01);}catch{}
 }
 function victorySound(){[523,659,784,1047].forEach((f,i)=>beep(f,.28,.07,i*.12));}
-function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=poseSVG(pose);$('target-diagram').setAttribute('aria-label',pose.name+'：'+pose.instruction);$('pose-name').textContent=pose.name;$('pose-category').textContent=pose.category;$('pose-instruction').textContent=pose.instruction;$('pose-number').textContent=String(engine.index+1).padStart(2,'0')+' / '+String(engine.totalRounds).padStart(2,'0');}
+function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=poseSVG(pose);$('target-diagram').setAttribute('aria-label',pose.name+'：'+pose.instruction);$('pose-name').textContent=pose.name;$('pose-number').textContent=String(engine.index+1).padStart(2,'0')+' / '+String(engine.totalRounds).padStart(2,'0');}
 function resize(){const r=ui.arena.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(devicePixelRatio||1,2);for(const c of [ui.tracking,ui.fx]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);fx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(ui.arena);resize();
 function cameraState(text,live=false){$('camera-state').textContent=text;$('camera-state').classList.toggle('live',live);}
@@ -115,7 +110,7 @@ function stopCamera(){
   generation++;modelEpoch++;ready=false;loading=false;busy=false;worker?.terminate();worker=null;pendingWorker?.terminate();pendingWorker=null;mainModel?.close();mainModel=null;show('connection-panel',false);show('retry-model-button',false);show('camera-picker-label',false);
   stream?.getTracks().forEach(t=>t.stop());stream=null;ui.video.srcObject=null;ui.video.style.display='none';players=[null,null];seenAt=[0,0];winner=null;particles=[];celebrateUntil=0;autoNextAt=0;pausedPhase=null;
   engine.reset();roundToken++;liveScores=[null,null];show('start-overlay');show('position-guides');show('countdown',false);show('result-overlay',false);show('round-history',false);show(ui.play,false);show(ui.stop,false);cameraState('CAMERA OFF');ui.cameraButton.disabled=false;ui.cameraButton.innerHTML='카메라 켜고 시작 <span aria-hidden="true">↗</span>';
-  $('round-kicker').textContent='READY TO PLAY';$('round-title').textContent='몸으로 하는 한판 승부';setTarget(0);updateScores(true);updateSteps();$('time-label').innerHTML='5.0 <small>SEC</small>';$('phase-label').textContent='준비되셨나요?';$('time-fill').style.transform='scaleX(1)';$('tracking-status').textContent='카메라 한 대로 함께 플레이하세요';$('timer-caption').textContent='5초 안에 자세 완성';renderSettings();
+  $('round-kicker').textContent='대기';$('round-title').textContent=`Round 1 / ${engine.totalRounds}`;setTarget(0);updateScores(true);updateSteps();$('time-label').innerHTML='5.0 <small>SEC</small>';$('phase-label').textContent='준비되셨나요?';$('time-fill').style.transform='scaleX(1)';$('tracking-status').textContent='두 명의 전신을 보여 주세요';$('timer-caption').textContent='5초 안에 자세 완성';renderSettings();
 }
 let recovering=false;
 async function runtimeFailure(){
@@ -146,7 +141,7 @@ function showRoundPreparation(){
   roundToken++;winner=null;celebrateUntil=0;autoNextAt=0;liveScores=[null,null];previousCount=-1;
   show('result-overlay',false);show(ui.play,false);show('position-guides',false);show('countdown');
   $('countdown').classList.remove('active');$('countdown-caption').textContent='전신 인식 완료 · 자동 시작';
-  setTarget(engine.poseIndex);updateSettingLock();$('round-kicker').textContent=solo()?'PRACTICE IN PROGRESS':'MATCH IN PROGRESS';
+  setTarget(engine.poseIndex);updateSettingLock();$('round-kicker').textContent=solo()?'연습 중':'대결 중';
   $('round-title').textContent=`Round ${engine.index+1} / ${engine.totalRounds}`;$('phase-label').textContent='3초 뒤 자동 시작';
   message('전신 인식 완료! 그대로 서 계시면 3초 뒤 시작합니다.');updateSteps();updateScores(true);
 }
@@ -193,9 +188,9 @@ function finishRound(state,now){
     $('result-detail').textContent='자세 유사도 · 최고 유지 점수';
     if(state==='finished'){
       $('result-overlay').classList.add('final');celebrateUntil=now+5000;
-      $('result-kicker').textContent='PRACTICE COMPLETE';$('result-title').textContent=`${result.average.toFixed(1)}%`;
+      $('result-kicker').textContent='연습 완료';$('result-title').textContent=`${result.average.toFixed(1)}%`;
       $('result-detail').textContent=`전체 평균 · 최고 ${result.best.toFixed(1)}%`;
-      $('round-kicker').textContent='PRACTICE COMPLETE';$('round-title').textContent=`${engine.totalRounds}판 연습 · 최종 기록`;
+      $('round-kicker').textContent='연습 완료';$('round-title').textContent=`${engine.totalRounds}판 연습 · 최종 기록`;
       $('phase-label').textContent='연습 완료';ui.play.textContent='다시 연습하기 ↗';
       message(`연습 완료! 평균 ${result.average.toFixed(1)}%, 최고 ${result.best.toFixed(1)}%입니다. 시작 자세를 바꿔 다시 도전해 보세요.`);
     }else{autoNextAt=now+5000;ui.play.textContent='다음 자세 →';$('phase-label').textContent='연습 결과';message('잠시 후 다음 자세 연습이 시작됩니다.');}
@@ -205,7 +200,7 @@ function finishRound(state,now){
   $('result-kicker').textContent=`ROUND ${engine.index+1} RESULT`;$('result-title').textContent=winner===null?'DRAW':`PLAYER ${winner+1} WINS`;$('result-detail').textContent=`${scores[0].toFixed(1)}%  :  ${scores[1].toFixed(1)}%`;
   if(state==='finished'){
     const result=matchResult(engine.rounds);winner=result.winner;celebrateUntil=Infinity;$('result-overlay').classList.add('final');$('result-kicker').textContent=winner===null?'BOTH PLAYERS':`PLAYER ${winner+1}`;$('result-title').textContent=winner===null?'DOUBLE VICTORY':'VICTORY';$('result-detail').textContent=winner===null?'완벽한 무승부! 두 분 모두 승리!':`${result.wins[winner]} ROUND WINS · 평균 ${result.averages[winner].toFixed(1)}%`;
-    $('round-kicker').textContent='MATCH COMPLETE';$('round-title').textContent=`${engine.totalRounds}라운드 · 최종 결과`;$('phase-label').textContent='대결 완료';ui.play.textContent='다시 대결하기 ↗';
+    $('round-kicker').textContent='대결 완료';$('round-title').textContent=`${engine.totalRounds}라운드 · 최종 결과`;$('phase-label').textContent='대결 완료';ui.play.textContent='다시 대결하기 ↗';
     message(result.tiedWins?(winner===null?'승수와 평균 점수가 같아 공동 승리입니다!':'승수가 같아 전체 라운드 평균 점수로 최종 승자를 가렸습니다.'):`Player ${winner+1} 승리! ${engine.totalRounds}라운드 대결을 마쳤습니다.`);
   }else{autoNextAt=now+5000;ui.play.textContent='다음 라운드 →';$('phase-label').textContent='라운드 결과';message('잠시 후 다음 라운드가 시작됩니다. 같은 자리를 유지해 주세요.');}
 }
