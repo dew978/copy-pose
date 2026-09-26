@@ -61,22 +61,22 @@ test('an invalid round automatically retries the same pose with clean scores',()
   assert.equal(g.advance(10500,{allReady:true,notBefore:10500}),'prepare');
   assert.equal(g.poseIndex,pose);assert.equal(g.windows[0].best,null);assert.equal(g.rounds.length,0);
 });
-test('ten drawable distinct targets cover all joints and score exactly 100',()=>{
-  assert.equal(POSES.length,10);assert.equal(new Set(POSES.map(p=>p.id)).size,10);
-  assert.equal(new Set(POSES.map(p=>JSON.stringify(p.points))).size,10);
+test('thirty drawable distinct targets cover all joints and score exactly 100',()=>{
+  assert.equal(POSES.length,30);assert.equal(new Set(POSES.map(p=>p.id)).size,30);
+  assert.equal(new Set(POSES.map(p=>JSON.stringify(p.points))).size,30);
   for(const pose of POSES){
     assert.equal(scorePose(pose.points,pose),100);
     for(const i of REQUIRED){assert.ok(pose.points[i]);const {x,y}=pose.points[i];assert.ok(150+x*68>6&&150+x*68<294);assert.ok(151+y*68>6&&151+y*68<279);}
     assert.ok(!/NaN|undefined/.test(poseSVG(pose)));
   }
 });
-test('duel uses all ten pose candidates without repeats; practice can select all ten',()=>{
+test('duel uses all thirty pose candidates without repeats; practice can select all thirty',()=>{
   const g=new MatchEngine({random:()=>0,totalRounds:5});
-  assert.equal(g.poseOrder.length,10);assert.equal(new Set(g.poseOrder).size,10);
+  assert.equal(g.poseOrder.length,30);assert.equal(new Set(g.poseOrder).size,30);
   assert.ok(g.poseOrder.slice(0,5).some(i=>i>=5));
   assert.notDeepEqual(g.poseOrder,POSES.map((_,i)=>i));
-  for(let offset=0;offset<10;offset++){
+  for(let offset=0;offset<POSES.length;offset++){
     const practice=new MatchEngine({playerCount:1,poseOffset:offset});assert.equal(practice.poseIndex,offset);
-    assert.equal(new Set(practice.poseOrder).size,10);
+    assert.equal(new Set(practice.poseOrder).size,30);
   }
 });

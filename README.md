@@ -6,7 +6,7 @@ One-player practice or two-player same-camera pose matching game. Choose 1, 3, o
 
 - Left and right screen halves identify Player 1 and Player 2. Players must remain in their assigned halves.
 - All required full bodies automatically trigger a three-second countdown, followed immediately by a five-second scoring window. Losing recognition cancels the countdown; returning restarts it from three. Results pause before the next automatic round. Final results remain until replay is armed; the replay button works even up close.
-- Ten exact reference pose diagrams are generated from the same landmarks used by the scoring function.
+- Thirty exact reference pose diagrams are generated from the same landmarks used by the scoring function.
 - Coordinates are mirrored into display space and corrected for video aspect ratio. Segment directions and elbow/knee angles are compared, removing translation and body-scale differences.
 - Scores are the maximum mean of a 350–650 ms valid sample window with at least three observations. No random scores or face-based scoring.
 - Missing full-body data causes a retry instead of awarding a false score or a default win.
@@ -15,9 +15,9 @@ One-player practice or two-player same-camera pose matching game. Choose 1, 3, o
 
 ## Practice mode
 
-Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Poses are random by default. Optionally choose one of ten starting poses, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
+Select 1인 연습 before starting. A single full body can be tracked anywhere in the frame; no opponent is required. Poses are random by default. Optionally choose one of thirty starting poses, then practice for the selected 1, 3, or 5 rounds. Results show each round score, overall average, and best round, without an opponent or match winner. Settings are locked during a session; stop or complete it to change modes.
 
-Both modes default to random poses from the full ten-pose pool without repeats within a session. The start-pose picker is available in both modes: a manual choice pins the first round, with remaining poses shuffled. Selecting Random restores the default behavior. Replays reshuffle while preserving the chosen setting. Round counts remain 1, 3, and 5.
+There are ten easy, ten medium, and ten hard poses. Both modes default to random poses from the full thirty-pose pool without repeats within a session. The same picker offers All Random, Hard Random, Medium Random, and Easy Random; filtered modes draw only from that tier. Difficulty measures pose coordination and balance, not a calibrated biomechanical scale. The start-pose picker is available in both modes: a manual choice pins the first round, with remaining poses shuffled. Selecting Random restores the default behavior. Replays reshuffle while preserving the chosen setting. Round counts remain 1, 3, and 5.
 
 ## Screen layout
 

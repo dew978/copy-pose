@@ -57,5 +57,5 @@ for(const playerCount of [1,2])test(`${playerCount}-player defaults to random an
   g.reset({playerCount:playerCount===1?2:1});assert.equal(g.poseOffset,null);
 });
 test('unsupported configurations are rejected',()=>{
-  for(const options of [{playerCount:0},{playerCount:3},{totalRounds:2},{poseOffset:10}])assert.throws(()=>new MatchEngine(options),RangeError);
+  for(const options of [{playerCount:0},{playerCount:3},{totalRounds:2},{poseOffset:POSES.length}])assert.throws(()=>new MatchEngine(options),RangeError);
 });
