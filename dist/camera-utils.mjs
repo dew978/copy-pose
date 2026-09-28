@@ -4,11 +4,32 @@ export function cameraPreflight({secure,available,embedded,policyAllowed,protoco
   if(!available)return {code:'CAMERA_API_UNAVAILABLE',message:'현재 앱에서는 카메라 연결을 지원하지 않습니다. 앱 내부 미리보기 대신 PC의 Chrome 또는 Edge에서 열어 주세요.'};
   return null;
 }
-export function requestCameraStream(mediaDevices,{deviceId='',timeoutMs=30000,isCurrent=()=>true}={}){
+export function cameraFrameInfo(width,height,requestedAspect='16:9'){
+  if(!(width>0&&height>0))return null;
+  const ratio=width/height,expected=requestedAspect==='4:3'?4/3:16/9;
+  const known=[['16:9',16/9],['4:3',4/3],['9:16',9/16],['3:4',3/4]];
+  const actual=known.find(([,r])=>Math.abs(ratio/r-1)<.02)?.[0]||`${width}×${height}`;
+  return {actual,matches:Math.abs(ratio/expected-1)<.02,width,height};
+}
+export function requestCameraStream(mediaDevices,{deviceId='',aspect='16:9',timeoutMs=30000,isCurrent=()=>true}={}){
   let expired=false,timer;
-  const constraints={audio:false,video:deviceId?{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}}:{facingMode:{ideal:'user'},width:{ideal:1280},height:{ideal:720}}};
-  const open=async()=>{let stream;try{stream=await mediaDevices.getUserMedia(constraints);}catch(e){if(e.name!=='OverconstrainedError')throw e;stream=await mediaDevices.getUserMedia({audio:false,video:deviceId?{deviceId:{exact:deviceId}}:true});}
-    if(expired||!isCurrent()){stream.getTracks().forEach(t=>t.stop());throw Object.assign(new Error('카메라 연결 요청이 취소되었습니다.'),{name:'AbortError'});}return stream;};
+  const full=aspect==='4:3',identity=deviceId?{deviceId:{exact:deviceId}}:{facingMode:{ideal:'user'}};
+  const native=mediaDevices.getSupportedConstraints?.().resizeMode?{resizeMode:{exact:'none'}}:{};
+  const attempts=[{...identity,width:{ideal:1280},height:{ideal:full?960:720},aspectRatio:{exact:full?4/3:16/9},...native}];
+  // If this ratio is unavailable, preserve the device's native frame before
+  // trying a legacy connection. Never synthesize a ratio by cropping it here.
+  if(native.resizeMode)attempts.push({...identity,...native});
+  attempts.push(deviceId?{deviceId:{exact:deviceId}}:true);
+  const abort=()=>Object.assign(new Error('카메라 연결 요청이 취소되었습니다.'),{name:'AbortError'});
+  const open=async()=>{
+    for(let i=0;i<attempts.length;i++){
+      if(expired||!isCurrent())throw abort();
+      let stream;
+      try{stream=await mediaDevices.getUserMedia({audio:false,video:attempts[i]});}
+      catch(e){if(expired||!isCurrent())throw abort();if(e.name==='OverconstrainedError'&&i<attempts.length-1)continue;throw e;}
+      if(expired||!isCurrent()){stream.getTracks().forEach(t=>t.stop());throw abort();}return stream;
+    }
+  };
   // The media request is issued synchronously, before audio or model loading.
   const attempt=open();
   const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{expired=true;reject(Object.assign(new Error('카메라 권한 응답 대기 시간이 지났습니다.'),{name:'CameraPermissionTimeout'}));},timeoutMs);});

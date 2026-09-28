@@ -1,5 +1,5 @@
 import {POSES,DIFFICULTIES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=8';
-import {cameraPreflight,requestCameraStream,attachCameraVideo,cameraErrorMessage} from './camera-utils.mjs';
+import {cameraPreflight,requestCameraStream,attachCameraVideo,cameraErrorMessage,cameraFrameInfo} from './camera-utils.mjs?v=9';
 import {createPoseModel} from './model-loader.mjs';
 const $=id=>document.getElementById(id);
 const ui={video:$('camera'),arena:$('arena'),tracking:$('tracking-canvas'),fx:$('fx-canvas'),cameraButton:$('camera-button'),play:$('play-button'),stop:$('stop-button'),message:$('game-message')};
@@ -11,6 +11,7 @@ const findingLabel=()=>solo()?'전신을 찾는 중…':'두 명의 전신을 �
 function settingsLocked(){return !['ready','finished'].includes(engine.phase);}
 function updateSettingLock(){
   const locked=settingsLocked();$('mode-settings').disabled=locked;$('round-settings').disabled=locked;$('practice-pose').disabled=locked;
+  $('camera-aspect').disabled=locked||loading;$('camera-picker').disabled=locked||loading;
 }
 function renderSettings(){
   document.body.classList.toggle('solo-mode',solo());
@@ -42,6 +43,9 @@ function changeSettings(options){
 
 let stream=null,worker=null,mainModel=null,ready=false,loading=false,busy=false;
 let modelEpoch=0,pendingWorker=null,selectedCamera='';
+let selectedAspect='16:9';
+try{if(localStorage.getItem('copy-pose-camera-aspect')==='4:3')selectedAspect='4:3';}catch{}
+$('camera-aspect').value=selectedAspect;
 let generation=0,roundToken=0,lastFrameTime=-1,lastCapture=0,modelErrors=0,frameSentAt=0;
 let players=[null,null],seenAt=[0,0],liveScores=[null,null],winner=null,celebrateUntil=0;
 let audio=null,sound=true,previousCount=-1,phaseWas='',particles=[],lastBurst=0,lastRender=0,autoNextAt=0;
@@ -59,6 +63,13 @@ function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=
 function resize(){const r=ui.arena.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(devicePixelRatio||1,2);for(const c of [ui.tracking,ui.fx]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);fx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(ui.arena);resize();
 function cameraState(text,live=false){$('camera-state').textContent=text;$('camera-state').classList.toggle('live',live);}
+function updateCameraFormat(){
+  const info=stream?cameraFrameInfo(ui.video.videoWidth,ui.video.videoHeight,selectedAspect):null;
+  show('camera-format',!!info);if(!info)return;
+  const label=$('camera-format');label.textContent=info.matches?info.actual:`${selectedAspect} 요청 · 실제 ${info.actual}`;
+  label.classList.toggle('format-fallback',!info.matches);label.title=`실제 촬영: ${info.width}×${info.height}`;
+  label.setAttribute('aria-label',`요청 ${selectedAspect}, 실제 촬영 ${info.actual}, ${info.width}×${info.height}`);
+}
 function connectionNotice(title,detail,code='',error=false){show('connection-panel');$('connection-title').textContent=title;$('connection-detail').textContent=detail;$('connection-code').textContent=code;$('connection-panel').classList.toggle('error',error);}
 function cameraEnvironment(){let policyAllowed=true;try{const policy=document.permissionsPolicy||document.featurePolicy;if(policy?.allowsFeature)policyAllowed=policy.allowsFeature('camera');}catch{}return {secure:window.isSecureContext,available:!!navigator.mediaDevices?.getUserMedia,embedded:window.self!==window.top,policyAllowed,protocol:location.protocol};}
 function createMainModel(gen=generation,epoch=modelEpoch){return createPoseModel(detail=>{if(gen===generation&&epoch===modelEpoch&&stream)connectionNotice('카메라 연결 완료 · 자세 인식 준비 중',detail);});}
@@ -88,27 +99,28 @@ async function preparePose(gen=generation){
     ready=true;loading=false;busy=false;lastFrameTime=-1;frameSentAt=0;cameraState('CAMERA ON',true);show('connection-panel',false);show(ui.play);ui.play.disabled=true;ui.play.textContent=findingLabel();
     message(readyPrompt());
   }catch(e){if(gen!==generation||epoch!==modelEpoch)return;modelEpoch++;pendingWorker?.terminate();pendingWorker=null;loading=false;ready=false;cameraState('CAMERA ON',true);show('retry-model-button');connectionNotice('카메라는 연결되었습니다 · 자세 인식 준비 실패','카메라 영상은 계속 표시됩니다. 아래 버튼으로 자세 인식만 다시 준비해 주세요. 파일 버전은 최신 Chrome·Edge에서 실행해 주세요.',`MODEL: ${e?.name||'Error'} — ${String(e?.message||e).slice(0,220)}`,true);message('카메라 연결과 자세 인식 준비는 별도로 처리됩니다.');}
-  finally{clearTimeout(timer);}
+  finally{clearTimeout(timer);updateSettingLock();}
 }
 async function startCamera(){
   if(loading||ready)return;
   const env=cameraEnvironment(),problem=cameraPreflight(env);
   if(problem){connectionNotice('현재 화면에서는 카메라를 열 수 없습니다',problem.message,problem.code,true);message(problem.message);return;}
   const gen=++generation;loading=true;ui.cameraButton.disabled=true;ui.cameraButton.textContent='카메라 권한 확인 중…';show(ui.stop);cameraState('CONNECTING');connectionNotice('카메라 연결 중','브라우저의 카메라 사용 요청을 허용해 주세요.');message('카메라를 허용해 주세요.');
+  updateSettingLock();
   try{
-    const pending=requestCameraStream(navigator.mediaDevices,{deviceId:selectedCamera,isCurrent:()=>gen===generation});
+    const pending=requestCameraStream(navigator.mediaDevices,{deviceId:selectedCamera,aspect:selectedAspect,isCurrent:()=>gen===generation});
     // Audio must never delay or prevent the user's camera permission prompt.
     try{if(!audio){audio=new (window.AudioContext||window.webkitAudioContext)();}void audio.resume().catch(()=>{});}catch{}
     const s=await pending;
     if(gen!==generation){s.getTracks().forEach(t=>t.stop());return;}
-    stream=s;await attachCameraVideo(ui.video,s);if(gen!==generation)return;ui.video.style.display='block';show('start-overlay',false);show('position-guides');cameraState('CAMERA ON',true);loading=false;refreshCameraPicker(gen);
+    stream=s;await attachCameraVideo(ui.video,s);if(gen!==generation)return;ui.video.style.display='block';show('start-overlay',false);show('position-guides');cameraState('CAMERA ON',true);updateCameraFormat();loading=false;refreshCameraPicker(gen);
     stream.getVideoTracks()[0].addEventListener('ended',()=>{if(gen===generation){stopCamera();message('카메라 연결이 종료되었습니다. 다시 연결해 주세요.');}});
     await preparePose(gen);
   }catch(e){if(gen!==generation)return;const reason=cameraErrorMessage(e,env);stopCamera();connectionNotice('카메라 연결을 확인해 주세요',reason,`CAMERA: ${e?.name||'Error'}`,true);message(reason);ui.cameraButton.textContent='카메라 다시 연결 ↗';}
 }
 function stopCamera(){
   generation++;modelEpoch++;ready=false;loading=false;busy=false;worker?.terminate();worker=null;pendingWorker?.terminate();pendingWorker=null;mainModel?.close();mainModel=null;show('connection-panel',false);show('retry-model-button',false);show('camera-picker-label',false);
-  stream?.getTracks().forEach(t=>t.stop());stream=null;ui.video.srcObject=null;ui.video.style.display='none';players=[null,null];seenAt=[0,0];winner=null;particles=[];celebrateUntil=0;autoNextAt=0;pausedPhase=null;
+  stream?.getTracks().forEach(t=>t.stop());stream=null;ui.video.srcObject=null;ui.video.style.display='none';show('camera-format',false);players=[null,null];seenAt=[0,0];winner=null;particles=[];celebrateUntil=0;autoNextAt=0;pausedPhase=null;
   engine.reset();roundToken++;liveScores=[null,null];show('start-overlay');show('position-guides');show('countdown',false);show('result-overlay',false);show('round-history',false);show(ui.play,false);show(ui.stop,false);cameraState('CAMERA OFF');ui.cameraButton.disabled=false;ui.cameraButton.innerHTML='카메라 켜고 시작 <span aria-hidden="true">↗</span>';
   $('round-kicker').textContent='대기';$('round-title').textContent=`Round 1 / ${engine.totalRounds}`;setTarget(0);updateScores(true);updateSteps();$('time-label').innerHTML='5.0 <small>SEC</small>';$('phase-label').textContent='준비되셨나요?';$('time-fill').style.transform='scaleX(1)';$('tracking-status').textContent='두 명의 전신을 보여 주세요';$('timer-caption').textContent='5초 안에 자세 완성';renderSettings();
 }
@@ -261,6 +273,13 @@ function loop(now){
 ui.cameraButton.addEventListener('click',startCamera);ui.play.addEventListener('click',startRound);ui.stop.addEventListener('click',stopCamera);
 $('retry-model-button').addEventListener('click',()=>preparePose());
 $('camera-picker').addEventListener('change',e=>{selectedCamera=e.target.value;stopCamera();startCamera();});
+$('camera-aspect').addEventListener('change',e=>{
+  if(loading||settingsLocked()){e.target.value=selectedAspect;return;}
+  selectedAspect=e.target.value==='4:3'?'4:3':'16:9';
+  try{localStorage.setItem('copy-pose-camera-aspect',selectedAspect);}catch{}
+  if(stream){selectedCamera=stream.getVideoTracks()[0]?.getSettings().deviceId||selectedCamera;stopCamera();void startCamera();}
+});
+ui.video.addEventListener('resize',updateCameraFormat);
 $('sound-button').addEventListener('click',async()=>{sound=!sound;$('sound-button').textContent=sound?'♫':'♪';$('sound-button').setAttribute('aria-label',sound?'소리 끄기':'소리 켜기');$('sound-button').title=sound?'소리 끄기':'소리 켜기';$('sound-button').style.opacity=sound?'1':'.5';if(sound)try{await audio?.resume();}catch{}});
 $('fullscreen-button').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{message('이 브라우저에서는 전체 화면 전환을 지원하지 않습니다. 가로 모드로 플레이하시면 더 넓게 보입니다.');}});
 $('rules-button').addEventListener('click',()=>$('rules-dialog').showModal());$('close-rules').addEventListener('click',()=>$('rules-dialog').close());$('rules-dialog').addEventListener('click',e=>{if(e.target===$('rules-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});

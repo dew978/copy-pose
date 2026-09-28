@@ -25,6 +25,12 @@ Two-player play has a solid lime center divider with a dark outline; it is hidde
 
 The main interface is sized for 16:9 desktop monitors: a compact header/settings bar, camera and pose panels, and score cards. The camera uses contain sizing and the overlay shares the same bounds, preserving the full frame. Wide short viewports retain separate camera/pose columns; narrow portrait viewports stack them. Repeated instructions are removed from the main view, with details available through the header help button.
 
+## Camera framing
+
+The capture-ratio selector offers 16:9 (1280×720 preferred) and 4:3 full-body (1280×960 preferred), separately from the widescreen game layout. It remembers the choice locally and reconnects the same camera when changed while idle or finished. During connection and active rounds it is locked. A video badge reports the actual delivered frame ratio, including a requested/actual notice if the camera cannot deliver the choice.
+
+Requests prefer a native, uncropped frame (`resizeMode: none` when supported). If the requested ratio fails, connection falls back to any native ratio on the same device, then basic constraints for compatibility; permission errors are not retried. 4:3 can recover vertical coverage if a camera's 16:9 mode crops its sensor, but cannot increase the optical field of view. Actual coverage and supported formats require testing on the target webcam. Rendering, inference, scoring and effects use the actual video dimensions.
+
 ## Inference
 
 MediaPipe Tasks Vision 0.10.21, Pose Landmarker Full, two poses, GPU with CPU fallback. Hosted mode uses a classic worker with main-thread fallback. The downloadable HTML embeds the JavaScript, baseline WASM and model, uses lazy local Blob URLs and the main-thread GPU path, and makes no model/font network requests. Camera permission is requested before any audio or model waits. Camera video remains available on model failure, with a separate retry. Permission, video and model errors are distinguished. Late permission grants after cancellation are explicitly released.

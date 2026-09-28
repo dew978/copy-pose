@@ -71,3 +71,12 @@ dialog{background:#20261b;color:var(--ink);border:1px solid #586342;border-radiu
 
 .time-legend{flex-wrap:wrap;row-gap:2px}.difficulty-badge{width:auto;min-width:24px;padding:0 5px}.difficulty-badge[data-difficulty="expert"]{color:#fff4e9;background:#733028;border-color:#733028}
 @media(max-width:650px) and (orientation:portrait){.time-legend strong{font-size:48px}.countdown.active>span{font-size:84px}}
+
+/* Capture proportions are independent of the monitor layout. */
+.arena-top{display:flex;align-items:center;gap:6px;max-width:calc(100% - 24px);flex-wrap:wrap}
+.camera-format{padding:5px 7px;border-radius:5px;background:#111c;border:1px solid #6e795a66;color:#d4dec8;font:600 11px var(--body);letter-spacing:0;white-space:nowrap}
+.camera-format.format-fallback{color:#ffd591;border-color:#a87c43}
+.capture-picker{margin-left:auto}.capture-picker select{max-width:130px}
+select:disabled{opacity:.5}
+@media(max-width:1000px){.capture-picker{margin-left:0}}
+@media(orientation:landscape) and (max-height:650px){.game-settings{flex-wrap:wrap;gap:6px 12px}.camera-format{font-size:9px;padding:4px 6px}}

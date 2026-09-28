@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111310"><meta name="description" content="1인 연습과 2인 대결을 즐기는 자세 맞추기 게임. 1판·3판·5판을 선택하세요.">
   <title>copy pose — 동작 맞추기</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111310'/%3E%3Cpath d='M27 17H16v30h11M37 17h11v30H37' fill='none' stroke='%23d9ff58' stroke-width='7'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./styles.css?v=8">
+  <link rel="stylesheet" href="./styles.css?v=9">
 </head>
 <body>
   <div class="app">
@@ -20,11 +20,12 @@
         <fieldset id="mode-settings"><legend>플레이 방식</legend><div class="option-buttons"><button type="button" data-players="2" aria-pressed="true">2인 대결</button><button type="button" data-players="1" aria-pressed="false">1인 연습</button></div></fieldset>
         <fieldset id="round-settings"><legend>진행 횟수</legend><div class="option-buttons"><button type="button" data-rounds="1" aria-pressed="false">단판</button><button type="button" data-rounds="3" aria-pressed="false">3판제</button><button type="button" data-rounds="5" aria-pressed="true">5판제</button></div></fieldset>
         <label id="practice-pose-label" class="practice-picker">출제 포즈<select id="practice-pose" aria-label="출제 포즈"><optgroup label="랜덤"><option value="random:all" selected>전체 랜덤</option><option value="random:expert">최상 랜덤</option><option value="random:hard">상 랜덤</option><option value="random:medium">중 랜덤</option><option value="random:easy">하 랜덤</option></optgroup></select></label>
+        <label class="practice-picker capture-picker">촬영 비율<select id="camera-aspect" aria-label="촬영 비율"><option value="16:9" selected>16:9 기본</option><option value="4:3">4:3 전신</option></select></label>
       </section>
       <div class="game-layout">
         <section class="arena" id="arena" aria-label="두 명의 카메라 플레이 화면">
           <video id="camera" autoplay playsinline muted></video><canvas id="tracking-canvas"></canvas><canvas id="fx-canvas"></canvas>
-          <div class="arena-top"><span class="camera-state" id="camera-state">CAMERA OFF</span></div>
+          <div class="arena-top"><span class="camera-state" id="camera-state">CAMERA OFF</span><span id="camera-format" class="camera-format hidden" role="status"></span></div>
           <div class="center-line" aria-hidden="true"></div>
           <div class="zone-label zone-left"><span class="player-dot p1"></span>PLAYER 1</div><div class="zone-label zone-right"><span class="player-dot p2"></span>PLAYER 2</div>
           <div id="position-guides" class="position-guides" aria-hidden="true"><div><span>01</span><p>왼쪽에 서 주세요</p></div><div><span>02</span><p>오른쪽에 서 주세요</p></div></div>
@@ -48,9 +49,9 @@
       <div id="connection-panel" class="connection-panel hidden" role="status"><div><strong id="connection-title">카메라 연결 준비</strong><p id="connection-detail"></p><small id="connection-code"></small></div><button id="retry-model-button" class="text-button hidden">자세 인식 다시 준비</button></div>
       <div class="game-controls"><p id="game-message" class="sr-only" aria-live="polite"></p><div><label id="camera-picker-label" class="camera-picker hidden">카메라<select id="camera-picker" aria-label="사용할 카메라"></select></label><button id="stop-button" class="text-button hidden">그만하기</button><button id="play-button" class="primary-button hidden">대결 시작 <span aria-hidden="true">→</span></button></div></div>
       <div id="round-history" class="round-history hidden" aria-label="라운드별 결과"></div>
-      <dialog id="rules-dialog"><button id="close-rules" class="dialog-close" aria-label="닫기">×</button><span class="mini-label">HOW TO PLAY</span><h2>자세를 맞추고, 점수를 겨루세요.</h2><ol><li>화면 왼쪽은 Player 1, 오른쪽은 Player 2입니다. 대결 중에는 자리를 바꾸지 마세요.</li><li>카메라를 켠 뒤 필요한 인원 모두의 전신이 보이면 3초 뒤 자동으로 시작합니다. 인식이 끊기면 다시 기다립니다. 시작 버튼을 누르러 가까이 오지 않아도 됩니다.</li><li>라운드마다 5초 동안 제시된 그림과 같은 방향으로 자세를 맞춰 주세요. 카메라 화면은 거울처럼 표시됩니다.</li><li>팔·다리 방향과 관절 각도를 비교합니다. 키나 화면 속 위치 차이는 보정합니다.</li><li>순간적인 오인식을 줄이기 위해 약 0.4초 동안 유지한 자세의 평균 중 최고 점수를 사용합니다.</li><li>단판·3판·5판 중 선택한 라운드를 모두 진행하고, 승수가 더 많으면 최종 승리합니다. 승수가 같으면 유효 라운드 평균 점수로 결정하며, 평균도 같으면 공동 승리입니다.</li><li>대결은 둘 중 한 명이라도, 연습은 본인의 전신 인식이 충분하지 않으면 해당 라운드를 다시 진행합니다.</li><li>포즈는 하·중·상·최상 각 10개씩 총 40종입니다. 전체 랜덤 또는 최상·상·중·하 랜덤을 선택할 수 있습니다. 두 모드 모두 선택한 범위 안에서 중복 없이 출제합니다. 1인 연습은 화면 어느 위치에서도 혼자 시작할 수 있습니다. 시작 자세를 선택하고 라운드별 점수와 최종 평균·최고 점수를 확인하세요. 개별 자세를 선택하면 첫 라운드에 나오며, 이후에는 전체 40종 중 중복 없이 랜덤 출제합니다.</li></ol><p>영상은 기기 안에서만 처리됩니다. 유사도는 게임용 추정 점수입니다. 카메라 각도·조명·가려짐에 따라 달라질 수 있습니다.</p></dialog>
+      <dialog id="rules-dialog"><button id="close-rules" class="dialog-close" aria-label="닫기">×</button><span class="mini-label">HOW TO PLAY</span><h2>자세를 맞추고, 점수를 겨루세요.</h2><ol><li>촬영 비율에서 16:9 기본 또는 4:3 전신을 선택하세요. 4:3은 카메라에 따라 위아래를 더 담을 수 있습니다. 지원하지 않는 비율은 가능한 방식으로 연결하며, 카메라 왼쪽 위에 실제 촬영 비율을 표시합니다. 촬영 비율은 대기 중이나 게임 종료 후 바꿀 수 있고, 변경하면 카메라를 다시 연결합니다. 선택은 이 브라우저에 저장됩니다.</li><li>화면 왼쪽은 Player 1, 오른쪽은 Player 2입니다. 대결 중에는 자리를 바꾸지 마세요.</li><li>카메라를 켠 뒤 필요한 인원 모두의 전신이 보이면 3초 뒤 자동으로 시작합니다. 인식이 끊기면 다시 기다립니다. 시작 버튼을 누르러 가까이 오지 않아도 됩니다.</li><li>라운드마다 5초 동안 제시된 그림과 같은 방향으로 자세를 맞춰 주세요. 카메라 화면은 거울처럼 표시됩니다.</li><li>팔·다리 방향과 관절 각도를 비교합니다. 키나 화면 속 위치 차이는 보정합니다.</li><li>순간적인 오인식을 줄이기 위해 약 0.4초 동안 유지한 자세의 평균 중 최고 점수를 사용합니다.</li><li>단판·3판·5판 중 선택한 라운드를 모두 진행하고, 승수가 더 많으면 최종 승리합니다. 승수가 같으면 유효 라운드 평균 점수로 결정하며, 평균도 같으면 공동 승리입니다.</li><li>대결은 둘 중 한 명이라도, 연습은 본인의 전신 인식이 충분하지 않으면 해당 라운드를 다시 진행합니다.</li><li>포즈는 하·중·상·최상 각 10개씩 총 40종입니다. 전체 랜덤 또는 최상·상·중·하 랜덤을 선택할 수 있습니다. 두 모드 모두 선택한 범위 안에서 중복 없이 출제합니다. 1인 연습은 화면 어느 위치에서도 혼자 시작할 수 있습니다. 시작 자세를 선택하고 라운드별 점수와 최종 평균·최고 점수를 확인하세요. 개별 자세를 선택하면 첫 라운드에 나오며, 이후에는 전체 40종 중 중복 없이 랜덤 출제합니다.</li></ol><p>영상은 기기 안에서만 처리됩니다. 유사도는 게임용 추정 점수입니다. 카메라 각도·조명·가려짐에 따라 달라질 수 있습니다.</p></dialog>
     </main>
   </div>
-  <script type="module" src="./app.mjs?v=8"></script>
+  <script type="module" src="./app.mjs?v=9"></script>
 </body>
 </html>
