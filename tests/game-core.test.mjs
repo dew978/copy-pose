@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {POSES,scorePose,assignPlayers,ScoreWindow,MatchEngine,matchResult,poseSVG} from '../dist/game-core.mjs';
 
-test('all thirty reference diagrams score exactly 100 against themselves',()=>{
-  assert.equal(POSES.length,30);
+test('all forty reference diagrams score exactly 100 against themselves',()=>{
+  assert.equal(POSES.length,40);
   for(const p of POSES){assert.equal(scorePose(p.points,p),100);assert.match(poseSVG(p),/^<svg/);}
 });
 test('score is invariant to body scale and screen translation',()=>{

@@ -1,4 +1,4 @@
-import {POSES,DIFFICULTIES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=7';
+import {POSES,DIFFICULTIES,REQUIRED,CONNECTIONS,assignPlayers,scorePose,MatchEngine,matchResult,practiceResult,roundWinner,poseSVG} from './game-core.mjs?v=8';
 import {cameraPreflight,requestCameraStream,attachCameraVideo,cameraErrorMessage} from './camera-utils.mjs';
 import {createPoseModel} from './model-loader.mjs';
 const $=id=>document.getElementById(id);
@@ -55,7 +55,7 @@ function beep(freq=600,duration=.1,volume=.07,delay=0){
   if(!sound||!audio)return;try{const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.type='sine';o.frequency.value=freq;const t=audio.currentTime+delay;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.start(t);o.stop(t+duration+.01);}catch{}
 }
 function victorySound(){[523,659,784,1047].forEach((f,i)=>beep(f,.28,.07,i*.12));}
-function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=poseSVG(pose);$('target-diagram').setAttribute('aria-label',pose.name+'：'+pose.instruction);$('pose-name').textContent=pose.name;$('pose-difficulty').textContent=DIFFICULTIES[pose.difficulty];$('pose-difficulty').setAttribute('aria-label','난이도 '+DIFFICULTIES[pose.difficulty]);$('pose-number').textContent=String(engine.index+1).padStart(2,'0')+' / '+String(engine.totalRounds).padStart(2,'0');}
+function setTarget(index){const pose=POSES[index];$('target-diagram').innerHTML=poseSVG(pose);$('target-diagram').setAttribute('aria-label',pose.name+'：'+pose.instruction);$('pose-name').textContent=pose.name;$('pose-difficulty').textContent=DIFFICULTIES[pose.difficulty];$('pose-difficulty').dataset.difficulty=pose.difficulty;$('pose-difficulty').setAttribute('aria-label','난이도 '+DIFFICULTIES[pose.difficulty]);$('pose-number').textContent=String(engine.index+1).padStart(2,'0')+' / '+String(engine.totalRounds).padStart(2,'0');}
 function resize(){const r=ui.arena.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(devicePixelRatio||1,2);for(const c of [ui.tracking,ui.fx]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);fx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(ui.arena);resize();
 function cameraState(text,live=false){$('camera-state').textContent=text;$('camera-state').classList.toggle('live',live);}
